@@ -35,7 +35,8 @@ ENV NODE_ENV=production \
     DATABASE_PATH=/app/data/lazentinel.db \
     AUTH_DATABASE_PATH=/app/data/lazentinel-auth.db \
     CLIENT_DIST=/app/client/dist \
-    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+    CLOAKBROWSER_CACHE_DIR=/ms-playwright \
+    CLOAKBROWSER_AUTO_UPDATE=false
 
 COPY --from=server-build /app/node_modules ./node_modules
 COPY --from=server-build /app/dist ./dist
@@ -43,9 +44,22 @@ COPY --from=client-build /app/client/dist ./client/dist
 COPY package.json ./
 
 # Lazada loads the displayed sale price and ratings in its client-side Mtop
-# request, so production includes Playwright's Chromium for accurate prices.
-RUN node node_modules/playwright-core/cli.js install --with-deps chromium \
+# request, so production bundles CloakBrowser's stealth Chromium instead of a
+# stock headless build. System libraries and fonts are the ones its binary
+# expects; the browser itself is downloaded now so first scrape stays fast.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 \
+    libdbus-1-3 libdrm2 libxkbcommon0 libatspi2.0-0 libxcomposite1 \
+    libxdamage1 libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 \
+    libcairo2 libasound2 libx11-xcb1 libfontconfig1 libx11-6 \
+    libxcb1 libxext6 libxshmfence1 \
+    libglib2.0-0 libgtk-3-0 libpangocairo-1.0-0 libcairo-gobject2 \
+    libgdk-pixbuf-2.0-0 libxss1 libxtst6 ca-certificates \
+    fonts-liberation fonts-noto-color-emoji fonts-unifont fonts-freefont-ttf \
+    fonts-ipafont-gothic fonts-wqy-zenhei fonts-tlwg-loma-otf fonts-urw-base35 \
   && rm -rf /var/lib/apt/lists/* \
+  && node node_modules/cloakbrowser/dist/cli.js install \
   && mkdir -p /app/data \
   && chown -R node:node /app /ms-playwright
 

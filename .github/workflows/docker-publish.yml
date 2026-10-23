@@ -59,8 +59,9 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      # arm64 is built through emulation. The image bundles Chromium, so this
-      # job can take noticeably longer than a native single-architecture build.
+      # arm64 is built through emulation. The image bundles CloakBrowser's
+      # stealth Chromium, so this job can take noticeably longer than a native
+      # single-architecture build.
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 

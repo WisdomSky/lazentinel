@@ -70,7 +70,7 @@ Positive means the price fell; negative means it rose. Products are sorted by `d
 | Layer     | Choice                                              |
 | --------- | --------------------------------------------------- |
 | Backend   | Node.js 24, Express 5, TypeScript, better-sqlite3   |
-| Pricing   | Playwright + headless Chromium                      |
+| Pricing   | CloakBrowser stealth Chromium (Playwright API)      |
 | Frontend  | Vue 3, Vite 8, TypeScript, TailwindCSS 4, SCSS      |
 | UI        | Shadcn-style components built on Reka UI, Chart.js  |
 | Database  | SQLite (WAL mode)                                   |
@@ -78,16 +78,17 @@ Positive means the price fell; negative means it rose. Products are sorted by `d
 
 ## Quick start (development)
 
-Requirements: Node.js 22+, npm, and Chromium (installed through Playwright in one command).
+Requirements: Node.js 22.12+, npm, and CloakBrowser's stealth Chromium (downloaded in one command).
 
 ```bash
 npm install
 npm --prefix client install
-npm run setup:browser   # Playwright's Chromium, or use an existing Chrome
+npm run setup:browser   # CloakBrowser's stealth Chromium (~200 MB, once)
 npm run dev
 ```
 
-The renderer also auto-detects a system Chrome/Chromium; `setup:browser` is the reproducible option. Docker users can skip it — the image includes Chromium.
+`setup:browser` is optional: the first scrape downloads the same binary if it is
+missing. Docker users can skip it — the image bundles CloakBrowser and its browser.
 
 - Frontend: <http://localhost:5173>
 - API: <http://localhost:3001>
@@ -129,7 +130,7 @@ This builds the image and starts it in the background via Docker Compose. Stop i
 npm run docker:down
 ```
 
-The equivalent raw commands are `docker compose up --build -d` and `docker compose down`. Open <http://localhost:3008>. Data is stored in the `.lazentinel-data` directory bind-mounted into the container. The image includes Playwright Chromium so Lazada's client-side sale price can be read; expect a larger image and additional build time. To use a different host port:
+The equivalent raw commands are `docker compose up --build -d` and `docker compose down`. Open <http://localhost:3008>. Data is stored in the `.lazentinel-data` directory bind-mounted into the container. The image includes CloakBrowser's stealth Chromium so Lazada's client-side sale price can be read; expect a larger image and additional build time. To use a different host port:
 
 ```bash
 APP_PORT=8080 npm run docker
@@ -193,9 +194,14 @@ build, and semantic tags for version tags such as `v1.2.3`.
 | `ENABLE_MULTIUSER` | `false`             | Enable accounts and private watchlists (`true` only) |
 | `AUTH_DATABASE_PATH` | `./data/lazentinel-auth.db` | Separate account/session database |
 | `COOKIE_SECURE`  | `false`               | Set `true` when served over HTTPS            |
-| `CHROMIUM_EXECUTABLE` | auto        | Optional path to Chrome/Chromium             |
+| `CLOAKBROWSER_BINARY_PATH` | auto       | Optional path to a local Chromium binary (skips the stealth download) |
+| `CLOAKBROWSER_CACHE_DIR` | `~/.cloakbrowser` | Where CloakBrowser caches its stealth Chromium |
+| `CLOAKBROWSER_LICENSE_KEY` | —        | Optional CloakBrowser Pro key for the newest binary |
+| `CLOAKBROWSER_PROXY` | —            | Optional single static proxy; disables the rotating pool |
+| `PROXY_ENABLED`  | `true`                | Rotate Lazada requests through `server/proxy/proxy_locations.json` |
+| `PROXY_SCHEME`   | `http`                | Proxy protocol for the rotating pool: `http` or `socks5` |
 
-Copy `.env.example` to `.env` for local overrides (already-set environment variables win). The tracking interval is not an environment variable; it is stored in SQLite and managed through Settings. Default 300 s, allowed 5–86400 s.
+Copy `.env.example` to `.env` for local overrides (already-set environment variables win). `CHROMIUM_EXECUTABLE` remains accepted as a legacy alias for `CLOAKBROWSER_BINARY_PATH`. The tracking interval is not an environment variable; it is stored in SQLite and managed through Settings. Default 300 s, allowed 5–86400 s.
 
 The application, package, Docker image, container, volume and default SQLite file now use the Lazentinel name. If you are upgrading from an earlier checkout, move your existing database to `data/lazentinel.db`, or point `DATABASE_PATH` at the old file, before starting the server.
 
@@ -224,19 +230,40 @@ The full response contract is in [`docs/api-contract.md`](docs/api-contract.md).
 
 Lazada is a client-rendered, anti-bot-protected storefront. The actual displayed price is not in the server HTML for discounted items — the HTML's `pdt_price` tracking field contains the original price (e.g. ₱13,990 while the product is on sale for ₱3,000). The tracker therefore:
 
-1. Renders the product page in headless Chromium and reads the successful
+1. Renders the product page in CloakBrowser's stealth Chromium and reads the successful
    `mtop.global.detail.web.getDetailInfo` response. Its `skuInfos[sku].price.salePrice`
    is the displayed sale price, and its `review` object supplies the rating and review count.
-2. Uses the server HTML only for fallback metadata (title, brand, image, currency) if
-   the browser render is unavailable. It deliberately does **not** fall back to the HTML
-   `pdt_price` for a price, so it can never record a struck-through original price as the
-   current price. The card shows a warning and retries on the next interval instead.
+2. When proxy rotation is disabled, uses the server HTML only for fallback metadata
+   (title, brand, image, currency) if the browser render is unavailable. It deliberately
+   does **not** fall back to the HTML `pdt_price` for a price, so it can never record a
+   struck-through original price as the current price. The card shows a warning and
+   retries on the next interval instead.
 
 This is a best-effort public-page reader, not an official API. Lazada can rate-limit,
 geo-restrict or change its markup, and some pages will not expose their client-side data
 to every request. In that case the product keeps its last known price and displays a retry
-warning. Handle Chromium as you would any local browser process, use respectful intervals,
+warning. Handle the browser as you would any local browser process, use respectful intervals,
 and follow Lazada's terms.
+
+### Proxy rotation
+
+Lazada requests rotate through the hosts in `server/proxy/proxy_locations.json`.
+For each host, credentials are resolved from the first working provider in
+`server/proxy/proxy_auth_providers.json` with
+`GET ?action=proxyauth&ip=<host>`; the returned token is used as both the
+username and password. Credentials are cached per host and only requested again
+after that host fails.
+
+- Every render uses the next host; a host is never reused consecutively.
+- If credential resolution fails for one host, the next host is tried.
+- Bot challenges and proxy connection failures rotate to another host.
+- A host whose credentials are unchanged after a failure is treated as down and
+  taken out of rotation for 3 hours.
+- If every host fails for a product URL, that product pauses for 3 hours. While
+  proxies are enabled, the scraper never falls back to a direct HTTP request.
+
+Set `PROXY_ENABLED=false` to disable rotation. A single `CLOAKBROWSER_PROXY`
+overrides the rotating pool.
 
 The card below shows the corrected extraction for a discounted Lazada PH listing: the
 tracked price is the displayed sale price, and Lazada's live rating/review summary is used.
@@ -257,7 +284,7 @@ tracked price is the displayed sale price, and Lazada's live rating/review summa
 | `npm test`            | Run Vitest tests                           |
 | `npm run typecheck`   | Type-check server and client               |
 | `npm run seed:demo`   | Seed four demo products with price history |
-| `npm run setup:browser` | Download Playwright Chromium for dev     |
+| `npm run setup:browser` | Download CloakBrowser's stealth Chromium   |
 | `npm run docker`      | Build and start the app with Docker Compose |
 | `npm run docker:down` | Stop the Docker Compose app                |
 
@@ -270,7 +297,8 @@ tracked price is the displayed sale price, and Lazada's live rating/review summa
 ├── server/                Express API, SQLite, scraper, tracker
 │   ├── auth.ts            Accounts, plaintext passwords, sessions
 │   ├── auth-db.ts         Separate auth SQLite database
-│   └── browser-renderer.ts  Chromium + Mtop displayed-price extraction
+│   ├── proxy/             Proxy host rotation and credential resolution
+│   └── browser-renderer.ts  CloakBrowser + Mtop displayed-price extraction
 ├── docs/                  API contract and screenshots
 ├── Dockerfile
 ├── docker-compose.yml

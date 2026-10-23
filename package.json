@@ -5,25 +5,26 @@
   "type": "module",
   "description": "Lazentinel — track Lazada product prices over time with a live, animated sentinel.",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.12"
   },
   "scripts": {
     "dev": "concurrently -k -n server,client -c green,cyan \"npm:dev:server\" \"npm:dev:client\"",
     "dev:server": "PORT=3001 tsx watch server/index.ts",
     "dev:client": "npm --prefix client run dev",
     "build": "npm run build:server && npm --prefix client run build",
-    "build:server": "tsc -p tsconfig.json",
+    "build:server": "tsc -p tsconfig.json && cp server/proxy/*.json dist/server/proxy/",
     "start": "node dist/server/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json && npm --prefix client run typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
     "seed:demo": "tsx server/seed-demo.ts",
-    "setup:browser": "playwright-core install chromium",
+    "setup:browser": "cloakbrowser install",
     "docker": "docker compose up --build",
     "docker:down": "docker compose down"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",
+    "cloakbrowser": "^0.6.3",
     "cookie-parser": "^1.4.7",
     "express": "^5.3.0",
     "playwright-core": "^1.64.1",

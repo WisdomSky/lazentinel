@@ -48,14 +48,19 @@ export type RenderHandler = (
   request: RenderRequest,
 ) => RenderedProduct | Promise<RenderedProduct>;
 
-/** In-memory ProductRenderer; never starts Chromium. */
+/** In-memory ProductRenderer; never starts a browser. */
 export class FakeRenderer implements ProductRenderer {
   readonly requests: RenderRequest[] = [];
+  readonly usesProxy?: boolean;
   closeCalls = 0;
   handler: RenderHandler;
 
-  constructor(handler: RenderHandler = () => makeRenderedProduct()) {
+  constructor(
+    handler: RenderHandler = () => makeRenderedProduct(),
+    options: { usesProxy?: boolean } = {},
+  ) {
     this.handler = handler;
+    this.usesProxy = options.usesProxy;
   }
 
   async render(request: RenderRequest): Promise<RenderedProduct> {

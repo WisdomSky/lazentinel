@@ -7,6 +7,7 @@ import {
   parseLazadaHtml,
   parsePrice,
 } from '../scraper.js';
+import { RenderBlockedError } from '../browser-renderer.js';
 import type { ScrapeErrorCode } from '../scraper.js';
 import {
   FakeRenderer,
@@ -801,6 +802,50 @@ describe('LazadaScraper with a renderer', () => {
     expect(result.product.price).toBeNull();
     expect(result.product.price).not.toBe(13_990);
     expect(result.warning).toBe(DISPLAYED_PRICE_UNAVAILABLE_WARNING);
+  });
+
+  it('never fetches HTML directly when the renderer uses proxies', async () => {
+    let fetchCalls = 0;
+    const renderer = new FakeRenderer(
+      () => {
+        throw new Error('every proxy failed');
+      },
+      { usesProxy: true },
+    );
+    const scraper = new LazadaScraper({
+      fetchImpl: stubFetch(() => {
+        fetchCalls += 1;
+        return fakeResponse(htmlOriginalPricePage());
+      }),
+      renderer,
+      timeoutMs: 1_000,
+    });
+
+    await expect(scraper.scrape(PH_PRODUCT_URL)).rejects.toThrow('every proxy failed');
+    expect(fetchCalls).toBe(0);
+  });
+
+  it('surfaces a proxy cooldown as BLOCKED without fetching HTML', async () => {
+    let fetchCalls = 0;
+    const blockedUntil = Date.now() + 3 * 60 * 60 * 1000;
+    const renderer = new FakeRenderer(
+      () => {
+        throw new RenderBlockedError('Pausing checks for 3 hours.', blockedUntil);
+      },
+      { usesProxy: true },
+    );
+    const scraper = new LazadaScraper({
+      fetchImpl: stubFetch(() => {
+        fetchCalls += 1;
+        return fakeResponse(htmlOriginalPricePage());
+      }),
+      renderer,
+      timeoutMs: 1_000,
+    });
+
+    const error = await expectScrapeError(scraper.scrape(PH_PRODUCT_URL), 'BLOCKED');
+    expect(error.message).toMatch(/3 hours/);
+    expect(fetchCalls).toBe(0);
   });
 
   it('does not fall back to the HTML price when the renderer has a title but no price', async () => {

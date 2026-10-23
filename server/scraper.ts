@@ -3,6 +3,7 @@ import type {
   RenderRequest,
   RenderedProduct,
 } from './browser-renderer.js';
+import { isRenderBlockedError } from './renderer-errors.js';
 import { isScrapeError, ScrapeError } from './errors.js';
 
 export { ScrapeError };
@@ -945,8 +946,8 @@ function chooseCanonicalUrl(
 
 /**
  * Lazada blocks direct calls to its client-side detail API. When a renderer is
- * configured we render the PDP in headless Chromium and read the displayed
- * sale price + review summary from the Mtop response. This is important because
+ * configured we render the PDP in CloakBrowser's stealth Chromium and read the
+ * displayed sale price + review summary from the Mtop response. This is important because
  * the HTML tracking payload's `pdt_price` is the *original* price on discounted
  * products. HTML is used only as a metadata fallback; when the rendered price
  * is unavailable we deliberately record no price rather than the wrong one.
@@ -978,8 +979,23 @@ export class LazadaScraper implements ScraperLike {
       try {
         rendered = await this.renderer.render(renderRequest);
       } catch (error) {
+        if (isRenderBlockedError(error)) {
+          throw new ScrapeError('BLOCKED', error.message, { cause: error });
+        }
         renderError = error;
       }
+    }
+
+    // With a proxy pool, every Lazada request must stay behind a proxy. Skip the
+    // direct HTML fallback entirely: a failure here means the rotated attempt
+    // failed, not that a different network path should be tried.
+    if (this.renderer?.usesProxy && (!rendered || !rendered.title)) {
+      if (isScrapeError(renderError)) throw renderError;
+      if (renderError instanceof Error) throw renderError;
+      throw new ScrapeError(
+        'PARSE',
+        'Could not read product details from that Lazada page.',
+      );
     }
 
     // The live renderer normally gives us the full product. The HTML fetch is

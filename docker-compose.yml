@@ -18,8 +18,12 @@ services:
       DATABASE_PATH: /app/data/lazentinel.db
       AUTH_DATABASE_PATH: /app/data/lazentinel-auth.db
       CLIENT_DIST: /app/client/dist
-      ENABLE_MULTIUSER: ${ENABLE_MULTIUSER:-true}
+      ENABLE_MULTIUSER: ${ENABLE_MULTIUSER:-false}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      CLOAKBROWSER_LICENSE_KEY: ${CLOAKBROWSER_LICENSE_KEY:-}
+      CLOAKBROWSER_PROXY: ${CLOAKBROWSER_PROXY:-}
+      PROXY_ENABLED: ${PROXY_ENABLED:-true}
+      PROXY_SCHEME: ${PROXY_SCHEME:-http}
     volumes:
       - ./.lazentinel-data:/app/data
 

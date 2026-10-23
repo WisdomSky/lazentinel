@@ -4,6 +4,7 @@ import { AuthService } from './auth.js';
 import { LazadaBrowserRenderer } from './browser-renderer.js';
 import { loadConfig, loadLocalEnv } from './config.js';
 import { AppDatabase } from './db.js';
+import { ProxyResolver } from './proxy/proxy_resolver.js';
 import { LazadaScraper } from './scraper.js';
 import { ProductService } from './service.js';
 
@@ -13,7 +14,22 @@ function main(): void {
   const db = new AppDatabase(config.databasePath);
   const authDb = config.multiUser ? new AuthDatabase(config.authDatabasePath) : null;
   const auth = authDb ? new AuthService(authDb) : null;
-  const renderer = new LazadaBrowserRenderer({ logger: console });
+
+  // A manual single proxy takes precedence; otherwise rotate through the
+  // location list and resolve credentials from the auth providers.
+  const staticProxy = process.env.CLOAKBROWSER_PROXY?.trim();
+  const proxyEnabled =
+    process.env.PROXY_ENABLED?.trim().toLowerCase() !== 'false' && !staticProxy;
+  const proxyResolver = proxyEnabled ? new ProxyResolver({ logger: console }) : null;
+  if (proxyResolver) {
+    console.info(`[proxy] Rotating across ${proxyResolver.size} proxy hosts.`);
+  } else if (staticProxy) {
+    console.info('[proxy] Using the single proxy from CLOAKBROWSER_PROXY.');
+  } else {
+    console.info('[proxy] Disabled; Lazada requests go out directly.');
+  }
+
+  const renderer = new LazadaBrowserRenderer({ logger: console, proxyResolver });
   const scraper = new LazadaScraper({ renderer });
   const service = new ProductService(db, scraper);
   const app = createApp({

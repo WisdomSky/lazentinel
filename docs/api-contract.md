@@ -119,10 +119,12 @@ Integer between 5 and 86400. `200` with the saved settings; `400` on invalid inp
   original/list price. Current Lazada HTML exposes `data.root.fields.tracking.pdt_price`,
   which is the original price for discounted products; it must not be used as the tracked
   price when the client-side PDP data is available. The production scraper renders the
-  page in headless Chromium and reads `skuInfos[sku].price.salePrice` and
+  page in CloakBrowser's stealth Chromium and reads `skuInfos[sku].price.salePrice` and
   `review.averageRating` / `review.reviews` from the Mtop getDetailInfo response.
 - If the live displayed price cannot be read, record no price point and surface a warning;
   never fall back to the HTML list price.
+- Lazada requests rotate through the configured proxy pool. If every proxy is rejected
+  for one product, return a `BLOCKED` error and stop trying that URL for 3 hours.
 - Missing rating/review data must not fail the scrape; store `null` and show it as
   "No ratings yet".
 - When the price is not present, still return the product metadata with `price: null`

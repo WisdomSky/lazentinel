@@ -1,5 +1,10 @@
-import { describe, expect, it } from 'vitest';
-import { extractMtopProductData } from '../browser-renderer.js';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  LazadaBrowserRenderer,
+  RenderBlockedError,
+  extractMtopProductData,
+} from '../browser-renderer.js';
+import type { ProxyProvider } from '../proxy/proxy_resolver.js';
 
 /**
  * Realistic Mtop PDP module. `tracking.pdt_price` is the struck-through
@@ -171,5 +176,36 @@ describe('extractMtopProductData', () => {
     { product: {} },
   ])('returns null for non-object or empty module data %j', (value) => {
     expect(extractMtopProductData(value)).toBeNull();
+  });
+});
+
+describe('LazadaBrowserRenderer proxy cooldown', () => {
+  it('pauses a URL for three hours after every proxy fails', async () => {
+    const nextProxy = vi.fn(async () => {
+      throw new Error('no proxy is available');
+    });
+    const proxyResolver: ProxyProvider = {
+      size: 19,
+      nextProxy,
+      reportFailure: () => undefined,
+    };
+    const renderer = new LazadaBrowserRenderer({
+      logger: { error: () => undefined, info: () => undefined },
+      proxyResolver,
+    });
+    const request = {
+      url: 'https://www.lazada.sg/products/proxied-i1.html',
+      locale: 'en-SG',
+      timezoneId: 'Asia/Singapore',
+    };
+
+    await expect(renderer.render(request)).rejects.toBeInstanceOf(RenderBlockedError);
+    const second = renderer.render(request);
+    await expect(second).rejects.toBeInstanceOf(RenderBlockedError);
+    await expect(second).rejects.toThrow(/Pausing checks for 3 hours/);
+
+    // The second call is rejected from the cooldown, without touching proxies.
+    expect(nextProxy).toHaveBeenCalledTimes(1);
+    await renderer.close();
   });
 });
