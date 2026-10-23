@@ -41,7 +41,8 @@ Only the exact value `true` enables it. When enabled:
 - Background tracking continues for every stored product whether its owner is
   signed in or not.
 - Clicking **Sign out** returns to the login screen.
-- The tracking interval setting remains global for the installation.
+- The tracking interval setting remains global for the installation and is read-only
+  while multi-user mode is enabled.
 
 Accounts and sessions are stored in a **separate SQLite database**
 (`./data/lazentinel-auth.db`, configurable via `AUTH_DATABASE_PATH`), while products
@@ -200,6 +201,7 @@ build, and semantic tags for version tags such as `v1.2.3`.
 | `CLOAKBROWSER_PROXY` | —            | Optional single static proxy; disables the rotating pool |
 | `PROXY_ENABLED`  | `true`                | Rotate Lazada requests through `server/proxy/proxy_locations.json` |
 | `PROXY_SCHEME`   | `http`                | Proxy protocol for the rotating pool: `http` or `socks5` |
+| `TWOCAPTCHA_API_KEY` | —                 | Optional 2Captcha key for the Browser API fallback |
 
 Copy `.env.example` to `.env` for local overrides (already-set environment variables win). `CHROMIUM_EXECUTABLE` remains accepted as a legacy alias for `CLOAKBROWSER_BINARY_PATH`. The tracking interval is not an environment variable; it is stored in SQLite and managed through Settings. Default 300 s, allowed 5–86400 s.
 
@@ -259,11 +261,20 @@ after that host fails.
 - Bot challenges and proxy connection failures rotate to another host.
 - A host whose credentials are unchanged after a failure is treated as down and
   taken out of rotation for 3 hours.
-- If every host fails for a product URL, that product pauses for 3 hours. While
+- If every listed host fails for a product URL, the optional 2Captcha Browser
+  API is tried. If that also fails, the product pauses for 3 hours. While
   proxies are enabled, the scraper never falls back to a direct HTTP request.
 
 Set `PROXY_ENABLED=false` to disable rotation. A single `CLOAKBROWSER_PROXY`
 overrides the rotating pool.
+
+If `TWOCAPTCHA_API_KEY` is set, the **2Captcha Browser API** is used only after
+every host in `proxy_locations.json` has been attempted for that product URL.
+It opens the marketplace homepage first, then the product page through one of
+the rotating proxies, and reads the Mtop response directly. This consumes
+2Captcha Browser API traffic. Only if the full proxy sweep and the Browser API
+both fail does the 3-hour product pause apply. Without a key, the
+proxy-exhaustion behavior is unchanged.
 
 The card below shows the corrected extraction for a discounted Lazada PH listing: the
 tracked price is the displayed sale price, and Lazada's live rating/review summary is used.
@@ -298,6 +309,7 @@ tracked price is the displayed sale price, and Lazada's live rating/review summa
 │   ├── auth.ts            Accounts, plaintext passwords, sessions
 │   ├── auth-db.ts         Separate auth SQLite database
 │   ├── proxy/             Proxy host rotation and credential resolution
+│   ├── twocaptcha.ts      2Captcha Browser API fallback
 │   └── browser-renderer.ts  CloakBrowser + Mtop displayed-price extraction
 ├── docs/                  API contract and screenshots
 ├── Dockerfile

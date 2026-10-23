@@ -24,6 +24,7 @@ services:
       CLOAKBROWSER_PROXY: ${CLOAKBROWSER_PROXY:-}
       PROXY_ENABLED: ${PROXY_ENABLED:-true}
       PROXY_SCHEME: ${PROXY_SCHEME:-http}
+      TWOCAPTCHA_API_KEY: ${TWOCAPTCHA_API_KEY:-}
     volumes:
       - ./.lazentinel-data:/app/data
 

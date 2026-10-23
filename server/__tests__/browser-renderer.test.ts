@@ -4,7 +4,9 @@ import {
   RenderBlockedError,
   extractMtopProductData,
 } from '../browser-renderer.js';
+import type { RenderFallback } from '../browser-renderer.js';
 import type { ProxyProvider } from '../proxy/proxy_resolver.js';
+import { makeRenderedProduct, silentLogger } from './helpers/fakes.js';
 
 /**
  * Realistic Mtop PDP module. `tracking.pdt_price` is the struck-through
@@ -206,6 +208,66 @@ describe('LazadaBrowserRenderer proxy cooldown', () => {
 
     // The second call is rejected from the cooldown, without touching proxies.
     expect(nextProxy).toHaveBeenCalledTimes(1);
+    await renderer.close();
+  });
+
+  it('uses the fallback after every proxy fails', async () => {
+    const nextProxy = vi.fn(async () => {
+      throw new Error('no proxy is available');
+    });
+    const render = vi.fn(async () =>
+      makeRenderedProduct({ title: 'Browser API Product', price: 321 }),
+    );
+    const fallback: RenderFallback = { configured: true, render };
+    const renderer = new LazadaBrowserRenderer({
+      logger: silentLogger,
+      proxyResolver: {
+        size: 19,
+        nextProxy,
+        reportFailure: () => undefined,
+      },
+      fallback,
+    });
+
+    const result = await renderer.render({
+      url: 'https://www.lazada.sg/products/fallback-i1.html',
+      locale: 'en-SG',
+      timezoneId: 'Asia/Singapore',
+    });
+
+    expect(result.title).toBe('Browser API Product');
+    expect(result.price).toBe(321);
+    expect(render).toHaveBeenCalledTimes(1);
+    await renderer.close();
+  });
+
+  it('pauses the URL when the fallback also fails', async () => {
+    const nextProxy = vi.fn(async () => {
+      throw new Error('no proxy is available');
+    });
+    const render = vi.fn(async () => {
+      throw new Error('Browser API is down');
+    });
+    const fallback: RenderFallback = { configured: true, render };
+    const renderer = new LazadaBrowserRenderer({
+      logger: silentLogger,
+      proxyResolver: {
+        size: 19,
+        nextProxy,
+        reportFailure: () => undefined,
+      },
+      fallback,
+    });
+    const request = {
+      url: 'https://www.lazada.sg/products/fallback-failed-i1.html',
+      locale: 'en-SG',
+      timezoneId: 'Asia/Singapore',
+    };
+
+    await expect(renderer.render(request)).rejects.toBeInstanceOf(RenderBlockedError);
+    await expect(renderer.render(request)).rejects.toBeInstanceOf(RenderBlockedError);
+
+    expect(render).toHaveBeenCalledTimes(1);
     await renderer.close();
   });
 });

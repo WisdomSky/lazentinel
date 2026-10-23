@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import {
   ChartNoAxesCombined,
+  ChevronDown,
   CircleAlert,
   Clock3,
   Loader2,
@@ -13,7 +14,6 @@ import {
   RefreshCw,
   Settings,
   Sun,
-  UserRound,
 } from 'lucide-vue-next';
 import { Toaster, toast } from 'vue-sonner';
 import 'vue-sonner/style.css';
@@ -59,6 +59,35 @@ const {
 const addDialogOpen = ref(false);
 const settingsDialogOpen = ref(false);
 const retrying = ref(false);
+const userMenuOpen = ref(false);
+const userMenuRef = ref<HTMLElement | null>(null);
+
+const userInitial = computed(
+  () => authUser.value?.email.trim().charAt(0).toUpperCase() || '?',
+);
+
+function handleDocumentPointerDown(event: PointerEvent) {
+  if (!userMenuOpen.value) return;
+  const target = event.target;
+  if (target instanceof Node && userMenuRef.value?.contains(target)) return;
+  userMenuOpen.value = false;
+}
+
+function handleDocumentKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && userMenuOpen.value) {
+    userMenuOpen.value = false;
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('pointerdown', handleDocumentPointerDown);
+  document.addEventListener('keydown', handleDocumentKeydown);
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', handleDocumentPointerDown);
+  document.removeEventListener('keydown', handleDocumentKeydown);
+});
 
 const productCountLabel = computed(() => {
   const count = products.value.length;
@@ -120,6 +149,7 @@ async function handleRetry() {
 }
 
 async function handleSignOut() {
+  userMenuOpen.value = false;
   try {
     await logout();
   } catch (error) {
@@ -136,6 +166,19 @@ async function handleSignOut() {
     &[data-state="checked"] {
       background-color: var(--live) !important;
     }
+  }
+
+  .user-menu-enter-active,
+  .user-menu-leave-active {
+    transition:
+      opacity 140ms ease,
+      transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .user-menu-enter-from,
+  .user-menu-leave-to {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
   }
 
 </style>
@@ -199,6 +242,7 @@ async function handleSignOut() {
           </div>
 
           <Button
+            v-if="!authMultiUser"
             id="settings"
             variant="outline"
             size="icon"
@@ -209,6 +253,67 @@ async function handleSignOut() {
           >
             <Settings aria-hidden="true" />
           </Button>
+
+          <div
+            v-if="authMultiUser && authUser"
+            ref="userMenuRef"
+            class="relative"
+          >
+            <button
+              type="button"
+              class="flex h-9 items-center gap-1.5 rounded-full border border-border/65 bg-card/70 pl-1 pr-2 text-[11.5px] font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45 sm:gap-2 sm:pr-2.5"
+              aria-haspopup="menu"
+              :aria-expanded="userMenuOpen"
+              :aria-label="`Account menu for ${authUser.email}`"
+              :title="authUser.email"
+              @click="userMenuOpen = !userMenuOpen"
+            >
+              <span
+                class="grid size-7 shrink-0 place-items-center rounded-full bg-primary text-[11px] font-semibold uppercase leading-none text-primary-foreground"
+                aria-hidden="true"
+              >
+                {{ userInitial }}
+              </span>
+              <span class="hidden max-w-[9.5rem] truncate sm:inline">
+                {{ authUser.email }}
+              </span>
+              <ChevronDown
+                class="size-3.5 shrink-0 text-muted-foreground/80 transition-transform duration-150"
+                :class="{ 'rotate-180': userMenuOpen }"
+                aria-hidden="true"
+              />
+            </button>
+
+            <Transition name="user-menu">
+              <div
+                v-if="userMenuOpen"
+                class="absolute right-0 top-[calc(100%+0.45rem)] z-50 w-60 rounded-xl border border-border/75 bg-card p-1.5 shadow-[0_18px_40px_-22px_rgba(15,20,109,0.38)]"
+                role="menu"
+                aria-label="Account menu"
+              >
+                <div class="px-2.5 pb-2 pt-1.5">
+                  <p
+                    class="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"
+                  >
+                    Signed in as
+                  </p>
+                  <p class="mt-1 truncate text-[12.5px] font-medium text-foreground">
+                    {{ authUser.email }}
+                  </p>
+                </div>
+                <div class="my-1 h-px bg-border/70" aria-hidden="true" />
+                <button
+                  type="button"
+                  role="menuitem"
+                  class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[12px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
+                  @click="handleSignOut"
+                >
+                  <LogOut class="size-3.5" aria-hidden="true" />
+                  Sign out
+                </button>
+              </div>
+            </Transition>
+          </div>
         </div>
       </div>
     </header>
@@ -271,26 +376,6 @@ async function handleSignOut() {
             />
             {{ live ? 'Updating live' : 'Updates paused' }}
           </span>
-        </div>
-
-        <div
-          v-if="authMultiUser"
-          class="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-muted-foreground"
-        >
-          <UserRound class="size-3.5 text-muted-foreground/70" aria-hidden="true" />
-          <span>
-            Signed in as
-            <span class="font-medium text-foreground/80">{{ authUser?.email }}</span>
-          </span>
-          <span class="text-muted-foreground/35" aria-hidden="true">•</span>
-          <button
-            type="button"
-            class="inline-flex items-center gap-1 text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
-            @click="handleSignOut"
-          >
-            <LogOut class="size-3.5" aria-hidden="true" />
-            Sign out
-          </button>
         </div>
       </section>
 
@@ -495,6 +580,7 @@ async function handleSignOut() {
     />
 
     <SettingsDialog
+      v-if="!authMultiUser"
       :open="settingsDialogOpen"
       :interval-seconds="settings?.trackingIntervalSeconds ?? null"
       :save-interval="saveSettings"

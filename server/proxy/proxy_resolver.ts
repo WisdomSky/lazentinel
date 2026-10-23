@@ -32,7 +32,10 @@ export interface ProxyEndpoint {
 
 export interface ProxyProvider {
   readonly size: number;
-  nextProxy(exclude?: ReadonlySet<string>): Promise<ProxyEndpoint>;
+  nextProxy(
+    exclude?: Set<string>,
+    options?: { includeUnavailable?: boolean },
+  ): Promise<ProxyEndpoint>;
   reportFailure(endpoint: ProxyEndpoint): void;
 }
 
@@ -227,17 +230,33 @@ export class ProxyResolver implements ProxyProvider {
 
   /**
    * Returns the next proxy in round-robin order. Consecutive calls never return
-   * the same host, and `exclude` removes hosts already attempted for one URL.
+   * the same host. `exclude` is the caller's attempted-host set: hosts in it
+   * are skipped, and every host this call tries (including hosts whose
+   * credentials fail) is added to it.
+   *
+   * `includeUnavailable` forces a full sweep: hosts in a credential cooldown or
+   * disabled by an earlier failure are still returned. The browser renderer uses
+   * this to guarantee that 2Captcha is only considered after every configured
+   * proxy host has been attempted for the URL.
    *
    * Credential resolution can fail for an individual host; in that case the
    * next host is tried immediately.
    */
-  async nextProxy(exclude: ReadonlySet<string> = new Set()): Promise<ProxyEndpoint> {
-    let skipped = exclude;
+  async nextProxy(
+    exclude: Set<string> = new Set(),
+    options: { includeUnavailable?: boolean } = {},
+  ): Promise<ProxyEndpoint> {
+    const skipped = exclude;
+    const includeUnavailable = options.includeUnavailable === true;
 
     for (let attempt = 0; attempt < this.states.length; attempt += 1) {
-      const state = this.pickCandidate(skipped);
+      const state = this.pickCandidate(skipped, includeUnavailable);
       if (!state) break;
+
+      // Mark every host we attempt, including hosts whose credentials fail.
+      // The callers pass the same set across a full sweep, so a failed host is
+      // not retried on every iteration.
+      skipped.add(state.location.ip);
 
       try {
         const credentials = await this.credentialsFor(state);
@@ -264,7 +283,6 @@ export class ProxyResolver implements ProxyProvider {
             error,
           );
         }
-        skipped = new Set([...skipped, state.location.ip]);
       }
     }
 
@@ -290,7 +308,10 @@ export class ProxyResolver implements ProxyProvider {
     state.credentials = null;
   }
 
-  private pickCandidate(exclude: ReadonlySet<string>): HostState | null {
+  private pickCandidate(
+    exclude: ReadonlySet<string>,
+    includeUnavailable: boolean,
+  ): HostState | null {
     const now = this.now();
 
     for (let offset = 0; offset < this.states.length; offset += 1) {
@@ -301,8 +322,10 @@ export class ProxyResolver implements ProxyProvider {
       const host = state.location.ip;
       if (host === this.lastHost) continue;
       if (exclude.has(host)) continue;
-      if (state.disabledUntil > now) continue;
-      if (state.authCooldownUntil > now) continue;
+      if (!includeUnavailable) {
+        if (state.disabledUntil > now) continue;
+        if (state.authCooldownUntil > now) continue;
+      }
 
       this.cursor = (index + 1) % this.states.length;
       this.lastHost = host;

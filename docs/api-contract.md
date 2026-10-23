@@ -110,6 +110,8 @@ Runs a check immediately. `200 { "product": Product, "warning"?: string }`, `404
 Body: `{ "trackingIntervalSeconds": number }`
 
 Integer between 5 and 86400. `200` with the saved settings; `400` on invalid input.
+In multi-user mode this endpoint is read-only and returns `403`, because the
+interval is installation-wide and is not editable per account.
 
 ## Scraper requirements
 
@@ -123,8 +125,10 @@ Integer between 5 and 86400. `200` with the saved settings; `400` on invalid inp
   `review.averageRating` / `review.reviews` from the Mtop getDetailInfo response.
 - If the live displayed price cannot be read, record no price point and surface a warning;
   never fall back to the HTML list price.
-- Lazada requests rotate through the configured proxy pool. If every proxy is rejected
-  for one product, return a `BLOCKED` error and stop trying that URL for 3 hours.
+- Lazada requests rotate through the configured proxy pool. Only after every host in
+  `proxy_locations.json` has been attempted for one product, try the 2Captcha Browser
+  API when `TWOCAPTCHA_API_KEY` is configured. Only if the full proxy sweep and the
+  Browser API both fail, return a `BLOCKED` error and stop trying that URL for 3 hours.
 - Missing rating/review data must not fail the scrape; store `null` and show it as
   "No ratings yet".
 - When the price is not present, still return the product metadata with `price: null`

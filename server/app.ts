@@ -271,6 +271,15 @@ export function createApp({
   });
 
   app.put('/api/settings', async (req, res) => {
+    // In multi-user mode the interval is installation-wide, so it is not
+    // editable from an individual account. Keep the value readable for the UI.
+    if (multiUser) {
+      res.status(403).json({
+        error: 'Tracking settings can only be changed when multi-user mode is disabled.',
+      });
+      return;
+    }
+
     const parsed = settingsSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: firstIssue(parsed.error) });

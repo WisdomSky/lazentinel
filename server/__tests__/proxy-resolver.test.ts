@@ -190,6 +190,48 @@ describe('ProxyResolver', () => {
     await expect(resolver.nextProxy()).rejects.toBeInstanceOf(ProxyUnavailableError);
   });
 
+  it('can force a full sweep across every configured host', async () => {
+    const resolver = makeResolver();
+    const attempted = new Set<string>();
+    const hosts: string[] = [];
+
+    for (let index = 0; index < LOCATIONS.length; index += 1) {
+      const proxy = await resolver.nextProxy(attempted, {
+        includeUnavailable: true,
+      });
+      hosts.push(proxy.host);
+    }
+
+    expect(hosts).toHaveLength(LOCATIONS.length);
+    expect(new Set(hosts).size).toBe(LOCATIONS.length);
+    expect(attempted.size).toBe(LOCATIONS.length);
+    await expect(
+      resolver.nextProxy(attempted, { includeUnavailable: true }),
+    ).rejects.toBeInstanceOf(ProxyUnavailableError);
+  });
+
+  it('includes a host in credential cooldown during a forced sweep', async () => {
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockRejectedValueOnce(new Error('down'))
+      .mockRejectedValueOnce(new Error('down'))
+      .mockImplementation(async () => textResponse(TOKEN));
+    const resolver = makeResolver({
+      fetchImpl,
+      locations: LOCATIONS.slice(0, 2),
+    });
+
+    const first = await resolver.nextProxy();
+    expect(first.host).toBe('10.0.0.2');
+
+    await expect(resolver.nextProxy()).rejects.toBeInstanceOf(ProxyUnavailableError);
+
+    const forced = await resolver.nextProxy(new Set(), {
+      includeUnavailable: true,
+    });
+    expect(forced.host).toBe('10.0.0.1');
+  });
+
   it('rejects an unexpected auth response and tries the next provider', async () => {
     const fetchImpl = vi
       .fn<typeof fetch>()

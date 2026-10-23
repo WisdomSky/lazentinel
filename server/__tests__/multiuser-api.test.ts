@@ -261,18 +261,18 @@ describe('multi-user HTTP API', () => {
     expect(db.getProduct(aliceId)).not.toBeNull();
   });
 
-  it('allows an authenticated owner to update global settings', async () => {
+  it('does not allow an authenticated owner to update global settings', async () => {
     const alice = request.agent(app);
     await registerAndLogin(alice, 'alice@example.com');
 
     const response = await alice
       .put('/api/settings')
       .send({ trackingIntervalSeconds: 60 })
-      .expect(200);
-    expect(response.body).toEqual({ trackingIntervalSeconds: 60 });
+      .expect(403);
+    expect(response.body).toEqual({ error: expect.any(String) });
 
     const readBack = await alice.get('/api/settings').expect(200);
-    expect(readBack.body).toEqual({ trackingIntervalSeconds: 60 });
+    expect(readBack.body).toEqual({ trackingIntervalSeconds: 300 });
   });
 
   it('hides legacy owner-0 products from authenticated accounts without deleting them', async () => {

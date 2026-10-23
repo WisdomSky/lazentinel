@@ -7,6 +7,7 @@ import { AppDatabase } from './db.js';
 import { ProxyResolver } from './proxy/proxy_resolver.js';
 import { LazadaScraper } from './scraper.js';
 import { ProductService } from './service.js';
+import { TwoCaptchaBrowser } from './twocaptcha.js';
 
 function main(): void {
   loadLocalEnv();
@@ -29,7 +30,29 @@ function main(): void {
     console.info('[proxy] Disabled; Lazada requests go out directly.');
   }
 
-  const renderer = new LazadaBrowserRenderer({ logger: console, proxyResolver });
+  const fallback = new TwoCaptchaBrowser({
+    logger: console,
+    proxyProvider: proxyResolver,
+  });
+  if (!fallback.configured) {
+    console.info(
+      '[2captcha] Browser API fallback disabled (TWOCAPTCHA_API_KEY is not set).',
+    );
+  } else if (proxyResolver) {
+    console.info(
+      '[2captcha] Browser API fallback enabled after every proxy host fails.',
+    );
+  } else {
+    console.info(
+      '[2captcha] Browser API key is set, but the fallback needs the rotating proxy pool.',
+    );
+  }
+
+  const renderer = new LazadaBrowserRenderer({
+    logger: console,
+    proxyResolver,
+    fallback,
+  });
   const scraper = new LazadaScraper({ renderer });
   const service = new ProductService(db, scraper);
   const app = createApp({

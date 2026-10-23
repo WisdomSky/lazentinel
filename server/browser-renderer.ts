@@ -27,6 +27,9 @@ const PROXY_FAILURE_PATTERN =
   /net::ERR_(?:PROXY|TUNNEL|CONNECTION|NAME|TIMED_OUT|SOCKS|ADDRESS_UNREACHABLE|NETWORK_CHANGED|INTERNET_DISCONNECTED)|\bECONN(?:REFUSED|RESET|ABORTED)\b/i;
 const NETWORK_TIMEOUT_PATTERN = /Timeout \d+ms exceeded/i;
 const BLOCKED_URL_COOLDOWN_MS = 3 * 60 * 60 * 1000;
+const PAGE_CLOSE_TIMEOUT_MS = 3_000;
+const CONTEXT_CLOSE_TIMEOUT_MS = 5_000;
+const ATTEMPT_TIMEOUT_PADDING_MS = 10_000;
 
 export interface RenderRequest {
   url: string;
@@ -55,6 +58,12 @@ export interface ProductRenderer {
   readonly usesProxy?: boolean;
 }
 
+/** A last-resort page source used after every proxy has failed. */
+export interface RenderFallback {
+  readonly configured: boolean;
+  render(request: RenderRequest): Promise<RenderedProduct>;
+}
+
 export interface RendererLogger {
   error(...args: unknown[]): void;
   info?(...args: unknown[]): void;
@@ -68,12 +77,34 @@ export interface LazadaBrowserRendererOptions {
   logger?: RendererLogger;
   /** Rotating proxy pool. Omit to connect directly or use CLOAKBROWSER_PROXY. */
   proxyResolver?: ProxyProvider | null;
+  /** Last-resort page source used only after the proxy pool is exhausted. */
+  fallback?: RenderFallback | null;
 }
 
 function isProxyFailure(error: unknown): boolean {
   if (error instanceof BotChallengeError) return false;
   const message = error instanceof Error ? error.message : String(error);
   return PROXY_FAILURE_PATTERN.test(message) || NETWORK_TIMEOUT_PATTERN.test(message);
+}
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new BrowserRenderError(message)), timeoutMs);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
 }
 
 function isObject(value: unknown): value is JsonObject {
@@ -270,6 +301,7 @@ export class LazadaBrowserRenderer implements ProductRenderer {
   private readonly maxConcurrency: number;
   private readonly logger: RendererLogger;
   private readonly proxyResolver: ProxyProvider | null;
+  private readonly fallback: RenderFallback | null;
   private readonly blockedUrls = new Map<string, number>();
 
   private browser: Browser | null = null;
@@ -292,6 +324,7 @@ export class LazadaBrowserRenderer implements ProductRenderer {
       info: (...args: unknown[]) => console.info(...args),
     };
     this.proxyResolver = options.proxyResolver ?? null;
+    this.fallback = options.fallback ?? null;
     // CloakBrowser reads this before downloading its stealth binary, so an
     // explicit path skips the download instead of only overriding the launch.
     if (executablePath) {
@@ -311,7 +344,7 @@ export class LazadaBrowserRenderer implements ProductRenderer {
     if (blockedUntil !== undefined) {
       if (blockedUntil > Date.now()) {
         throw new RenderBlockedError(
-          `Lazada blocked every proxy for this product. Pausing checks for 3 hours (until ${new Date(blockedUntil).toISOString()}).`,
+          `Lazada is still blocking this product. Pausing checks for 3 hours (until ${new Date(blockedUntil).toISOString()}).`,
           blockedUntil,
         );
       }
@@ -327,19 +360,25 @@ export class LazadaBrowserRenderer implements ProductRenderer {
 
       const attempted = new Set<string>();
       let lastError: unknown;
+      let sweepComplete = true;
 
       for (;;) {
         let endpoint: ProxyEndpoint;
         try {
-          endpoint = await proxyProvider.nextProxy(attempted);
+          endpoint = await proxyProvider.nextProxy(attempted, {
+            includeUnavailable: true,
+          });
         } catch (error) {
           lastError = error;
           break;
         }
-        attempted.add(endpoint.host);
 
         try {
-          return await this.renderWithBrowser(request, endpoint);
+          return await withTimeout(
+            this.renderWithBrowser(request, endpoint),
+            this.timeoutMs + ATTEMPT_TIMEOUT_PADDING_MS,
+            `Timeout ${this.timeoutMs + ATTEMPT_TIMEOUT_PADDING_MS}ms exceeded while rendering the page.`,
+          );
         } catch (error) {
           lastError = error;
           if (error instanceof BotChallengeError) {
@@ -355,18 +394,61 @@ export class LazadaBrowserRenderer implements ProductRenderer {
             proxyProvider.reportFailure(endpoint);
             continue;
           }
+          if (
+            error instanceof BrowserRenderError &&
+            /could not be started/i.test(error.message)
+          ) {
+            sweepComplete = false;
+            this.logger.error(
+              '[renderer] The stealth browser could not start; trying the 2Captcha Browser API.',
+            );
+            break;
+          }
+          // The full sweep is mandatory before 2Captcha. Keep going until every
+          // configured host has been attempted for this URL.
+          if (this.fallback?.configured) {
+            this.logger.info?.(
+              '[renderer] Browser render failed; trying the next proxy before the 2Captcha fallback.',
+            );
+            continue;
+          }
           this.logger.error('[renderer] Live Lazada price render failed:', error);
           throw error;
+        }
+      }
+
+      if (this.fallback?.configured) {
+        this.logger.info?.(
+          sweepComplete
+            ? `[renderer] All ${attempted.size} configured proxy hosts were attempted for ${request.url}; trying the 2Captcha Browser API.`
+            : `[renderer] The stealth browser could not start for ${request.url}; trying the 2Captcha Browser API.`,
+        );
+        try {
+          const rendered = await this.fallback.render(request);
+          this.logger.info?.(
+            `[renderer] 2Captcha Browser API returned product data for ${request.url} (price: ${rendered.price ?? 'unavailable'}).`,
+          );
+          return rendered;
+        } catch (error) {
+          lastError = error;
+          this.logger.error(
+            '[renderer] 2Captcha Browser API fallback failed:',
+            error,
+          );
         }
       }
 
       const retryAt = Date.now() + BLOCKED_URL_COOLDOWN_MS;
       this.blockedUrls.set(request.url, retryAt);
       this.logger.error(
-        `[renderer] Every proxy failed for ${request.url}; pausing this product for 3 hours.`,
+        this.fallback?.configured
+          ? `[renderer] All proxies and the 2Captcha Browser API failed for ${request.url}; pausing this product for 3 hours.`
+          : `[renderer] Every proxy failed for ${request.url}; pausing this product for 3 hours.`,
       );
       throw new RenderBlockedError(
-        'Lazada blocked every available proxy. Pausing checks for this product for 3 hours.',
+        this.fallback?.configured
+          ? 'Lazada blocked every proxy and the 2Captcha Browser API fallback failed. Pausing checks for this product for 3 hours.'
+          : 'Lazada blocked every available proxy. Pausing checks for this product for 3 hours.',
         retryAt,
         { cause: lastError },
       );
@@ -401,7 +483,11 @@ export class LazadaBrowserRenderer implements ProductRenderer {
       // response when those requests are aborted.
       return await this.renderPage(context, request);
     } finally {
-      await context.close().catch((error: unknown) => {
+      await withTimeout(
+        context.close(),
+        CONTEXT_CLOSE_TIMEOUT_MS,
+        `Timeout ${CONTEXT_CLOSE_TIMEOUT_MS}ms exceeded while closing the browser context.`,
+      ).catch((error: unknown) => {
         this.logger.error('[renderer] Could not close browser context:', error);
       });
     }
@@ -414,7 +500,11 @@ export class LazadaBrowserRenderer implements ProductRenderer {
     this.blockedUrls.clear();
     if (!browser) return;
     try {
-      await browser.close();
+      await withTimeout(
+        browser.close(),
+        10_000,
+        'Timeout 10000ms exceeded while closing CloakBrowser.',
+      );
     } catch (error) {
       this.logger.error('[renderer] Could not close CloakBrowser cleanly:', error);
     }
@@ -440,8 +530,13 @@ export class LazadaBrowserRenderer implements ProductRenderer {
       }
       return data;
     } finally {
-      await page.close().catch(() => {
-        // The context is closed by the caller.
+      await withTimeout(
+        page.close().catch(() => undefined),
+        PAGE_CLOSE_TIMEOUT_MS,
+        `Timeout ${PAGE_CLOSE_TIMEOUT_MS}ms exceeded while closing the page.`,
+      ).catch(() => {
+        // A stuck proxy can leave page.close() hanging. The context close and
+        // the per-attempt timeout still free the caller.
       });
     }
   }
