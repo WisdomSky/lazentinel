@@ -190,6 +190,7 @@ build, and semantic tags for version tags such as `v1.2.3`.
 | Variable         | Default               | Description                                  |
 | ---------------- | --------------------- | -------------------------------------------- |
 | `PORT`           | `3000`                | HTTP port                                    |
+| `DEFAULT_TRACKING_INTERVAL_MINUTES` | `5` | Interval in minutes; when set, applied on startup and overrides the saved interval |
 | `DATABASE_PATH`  | `./data/lazentinel.db` | SQLite file (parent directory is created)   |
 | `CLIENT_DIST`    | `./client/dist`       | Directory of the built Vue app               |
 | `ENABLE_MULTIUSER` | `false`             | Enable accounts and private watchlists (`true` only) |
@@ -203,7 +204,7 @@ build, and semantic tags for version tags such as `v1.2.3`.
 | `PROXY_SCHEME`   | `http`                | Proxy protocol for the rotating pool: `http` or `socks5` |
 | `TWOCAPTCHA_API_KEY` | —                 | Optional 2Captcha key for the Browser API fallback |
 
-Copy `.env.example` to `.env` for local overrides (already-set environment variables win). `CHROMIUM_EXECUTABLE` remains accepted as a legacy alias for `CLOAKBROWSER_BINARY_PATH`. The tracking interval is not an environment variable; it is stored in SQLite and managed through Settings. Default 300 s, allowed 5–86400 s.
+Copy `.env.example` to `.env` for local overrides (already-set environment variables win). `CHROMIUM_EXECUTABLE` remains accepted as a legacy alias for `CLOAKBROWSER_BINARY_PATH`. When `DEFAULT_TRACKING_INTERVAL_MINUTES` is set, it is applied on startup and takes precedence over the saved interval in both single-user and multi-user modes. Unset it to manage the interval through Settings (single-user mode). If it is unset or empty, a new database starts at 5 minutes and existing saved settings are preserved. The active tracking interval is stored in SQLite. Default 5 minutes, allowed 5–86400 seconds.
 
 The application, package, Docker image, container, volume and default SQLite file now use the Lazentinel name. If you are upgrading from an earlier checkout, move your existing database to `data/lazentinel.db`, or point `DATABASE_PATH` at the old file, before starting the server.
 

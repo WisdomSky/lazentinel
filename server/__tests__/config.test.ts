@@ -53,3 +53,66 @@ describe('loadConfig multi-user settings', () => {
     expect(loadConfig({ DATABASE_PATH: absolute }).databasePath).toBe(absolute);
   });
 });
+
+describe('loadConfig default tracking interval', () => {
+  it('falls back to 5 minutes when unset or empty', () => {
+    expect(loadConfig({}).defaultTrackingIntervalSeconds).toBe(300);
+    expect(loadConfig({}).defaultTrackingIntervalFromEnv).toBe(false);
+    expect(
+      loadConfig({ DEFAULT_TRACKING_INTERVAL_MINUTES: '' })
+        .defaultTrackingIntervalSeconds,
+    ).toBe(300);
+    expect(
+      loadConfig({ DEFAULT_TRACKING_INTERVAL_MINUTES: '' })
+        .defaultTrackingIntervalFromEnv,
+    ).toBe(false);
+    expect(
+      loadConfig({ DEFAULT_TRACKING_INTERVAL_MINUTES: '   ' })
+        .defaultTrackingIntervalSeconds,
+    ).toBe(300);
+    expect(
+      loadConfig({ DEFAULT_TRACKING_INTERVAL_MINUTES: '   ' })
+        .defaultTrackingIntervalFromEnv,
+    ).toBe(false);
+  });
+
+  it('converts a custom value from minutes to seconds', () => {
+    expect(
+      loadConfig({ DEFAULT_TRACKING_INTERVAL_MINUTES: '5' })
+        .defaultTrackingIntervalSeconds,
+    ).toBe(300);
+    expect(
+      loadConfig({ DEFAULT_TRACKING_INTERVAL_MINUTES: '5' })
+        .defaultTrackingIntervalFromEnv,
+    ).toBe(true);
+    expect(
+      loadConfig({ DEFAULT_TRACKING_INTERVAL_MINUTES: '10' })
+        .defaultTrackingIntervalSeconds,
+    ).toBe(600);
+    expect(
+      loadConfig({ DEFAULT_TRACKING_INTERVAL_MINUTES: '0.5' })
+        .defaultTrackingIntervalSeconds,
+    ).toBe(30);
+    expect(
+      loadConfig({ DEFAULT_TRACKING_INTERVAL_MINUTES: '5.5' })
+        .defaultTrackingIntervalSeconds,
+    ).toBe(330);
+    expect(
+      loadConfig({ DEFAULT_TRACKING_INTERVAL_MINUTES: '1440' })
+        .defaultTrackingIntervalSeconds,
+    ).toBe(86_400);
+    expect(
+      loadConfig({ DEFAULT_TRACKING_INTERVAL_MINUTES: '0.0833' })
+        .defaultTrackingIntervalSeconds,
+    ).toBe(5);
+  });
+
+  it.each(['0', '-1', '1441', '0.01', 'abc', 'NaN', 'Infinity'])(
+    'rejects invalid value %j',
+    (value) => {
+      expect(() =>
+        loadConfig({ DEFAULT_TRACKING_INTERVAL_MINUTES: value }),
+      ).toThrow(/DEFAULT_TRACKING_INTERVAL_MINUTES/);
+    },
+  );
+});

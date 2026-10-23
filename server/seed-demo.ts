@@ -91,7 +91,10 @@ function main(): void {
   const force = process.argv.includes('--force');
   loadLocalEnv();
   const config = loadConfig(process.env);
-  const db = new AppDatabase(config.databasePath);
+  const db = new AppDatabase(config.databasePath, {
+    defaultTrackingIntervalSeconds: config.defaultTrackingIntervalSeconds,
+    overrideDefaultTrackingInterval: config.defaultTrackingIntervalFromEnv,
+  });
 
   try {
     const existingCount = db.countProducts();

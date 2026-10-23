@@ -144,3 +144,47 @@ describe('v2 product database migration', () => {
     }
   });
 });
+
+describe('configurable default tracking interval', () => {
+  it('seeds a new database with the provided default', () => {
+    const file = tempDbPath();
+    const db = new AppDatabase(file, { defaultTrackingIntervalSeconds: 900 });
+    try {
+      expect(db.getSettings()).toEqual({ trackingIntervalSeconds: 900 });
+    } finally {
+      db.close();
+    }
+  });
+
+  it('does not overwrite an existing saved interval', () => {
+    const file = tempDbPath();
+    const first = new AppDatabase(file, { defaultTrackingIntervalSeconds: 60 });
+    expect(first.getSettings()).toEqual({ trackingIntervalSeconds: 60 });
+    first.setSettings({ trackingIntervalSeconds: 120 });
+    first.close();
+
+    const second = new AppDatabase(file, { defaultTrackingIntervalSeconds: 900 });
+    try {
+      expect(second.getSettings()).toEqual({ trackingIntervalSeconds: 120 });
+    } finally {
+      second.close();
+    }
+  });
+
+  it('overrides an existing interval when explicitly requested', () => {
+    const file = tempDbPath();
+    const first = new AppDatabase(file, { defaultTrackingIntervalSeconds: 60 });
+    first.setSettings({ trackingIntervalSeconds: 120 });
+    first.close();
+
+    const second = new AppDatabase(file, {
+      defaultTrackingIntervalSeconds: 600,
+      overrideDefaultTrackingInterval: true,
+    });
+    try {
+      expect(second.getSettings()).toEqual({ trackingIntervalSeconds: 600 });
+    } finally {
+      second.close();
+    }
+  });
+});

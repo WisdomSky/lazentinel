@@ -12,6 +12,9 @@ export interface AppConfig {
   clientDist: string;
   multiUser: boolean;
   cookieSecure: boolean;
+  defaultTrackingIntervalSeconds: number;
+  /** True when DEFAULT_TRACKING_INTERVAL_MINUTES was explicitly provided. */
+  defaultTrackingIntervalFromEnv: boolean;
 }
 
 function parsePort(raw: string | undefined): number {
@@ -44,6 +47,22 @@ function parseClientDist(raw: string | undefined): string {
   return resolveFromCwd(raw?.trim() || 'client/dist');
 }
 
+function parseDefaultTrackingIntervalMinutes(raw: string | undefined): number {
+  const value = raw?.trim();
+  if (!value) return DEFAULT_TRACKING_INTERVAL_SECONDS;
+
+  const minutes = Number(value);
+  const seconds = Number.isFinite(minutes)
+    ? Math.round(minutes * 60)
+    : Number.NaN;
+  if (!Number.isFinite(minutes) || minutes <= 0 || !isValidTrackingInterval(seconds)) {
+    throw new Error(
+      `DEFAULT_TRACKING_INTERVAL_MINUTES must be a positive number of minutes that converts to between ${MIN_TRACKING_INTERVAL_SECONDS} and ${MAX_TRACKING_INTERVAL_SECONDS} seconds (received "${raw}").`,
+    );
+  }
+  return seconds;
+}
+
 /**
  * Loads a local `.env` file when present. Values already present in the
  * environment (Docker, shell, npm scripts) are not overwritten.
@@ -57,6 +76,7 @@ export function loadLocalEnv(
 
 /** Reads server configuration from the environment. Paths are cwd-relative. */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
+  const defaultTrackingIntervalRaw = env.DEFAULT_TRACKING_INTERVAL_MINUTES;
   return {
     port: parsePort(env.PORT),
     databasePath: parseDatabasePath(env.DATABASE_PATH),
@@ -66,6 +86,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     // the single-user behavior.
     multiUser: env.ENABLE_MULTIUSER === 'true',
     cookieSecure: env.COOKIE_SECURE === 'true',
+    defaultTrackingIntervalSeconds: parseDefaultTrackingIntervalMinutes(
+      defaultTrackingIntervalRaw,
+    ),
+    defaultTrackingIntervalFromEnv: Boolean(defaultTrackingIntervalRaw?.trim()),
   };
 }
 

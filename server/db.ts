@@ -1,7 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
-import { DEFAULT_TRACKING_INTERVAL_SECONDS } from './config.js';
+import { DEFAULT_TRACKING_INTERVAL_SECONDS, isValidTrackingInterval } from './config.js';
 
 export interface ProductRow {
   id: number;
@@ -57,6 +57,16 @@ export interface PriceSummary {
 
 export interface Settings {
   trackingIntervalSeconds: number;
+}
+
+export interface AppDatabaseOptions {
+  /** Initial interval for a new settings row; existing rows are preserved. */
+  defaultTrackingIntervalSeconds?: number;
+  /**
+   * Overwrite an existing saved interval with the default. Used when the
+   * deployment explicitly supplies DEFAULT_TRACKING_INTERVAL_MINUTES.
+   */
+  overrideDefaultTrackingInterval?: boolean;
 }
 
 interface SettingsRow {
@@ -133,6 +143,7 @@ const PRODUCT_INDEXES = `
  */
 export class AppDatabase {
   private readonly sqlite: Database.Database;
+  private readonly defaultTrackingIntervalSeconds: number;
 
   private readonly insertProductStmt: Database.Statement<
     {
@@ -210,7 +221,13 @@ export class AppDatabase {
   private readonly selectSettingsStmt: Database.Statement<[], { key: string; value: string }>;
   private readonly upsertSettingStmt: Database.Statement<{ key: string; value: string }, unknown>;
 
-  constructor(databasePath: string) {
+  constructor(databasePath: string, options: AppDatabaseOptions = {}) {
+    this.defaultTrackingIntervalSeconds =
+      options.defaultTrackingIntervalSeconds !== undefined &&
+      isValidTrackingInterval(options.defaultTrackingIntervalSeconds)
+        ? options.defaultTrackingIntervalSeconds
+        : DEFAULT_TRACKING_INTERVAL_SECONDS;
+
     if (databasePath !== ':memory:') {
       mkdirSync(path.dirname(databasePath), { recursive: true });
     }
@@ -225,7 +242,22 @@ export class AppDatabase {
     this.initializeSchema();
     this.sqlite
       .prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)')
-      .run('trackingIntervalSeconds', String(DEFAULT_TRACKING_INTERVAL_SECONDS));
+      .run(
+        'trackingIntervalSeconds',
+        String(this.defaultTrackingIntervalSeconds),
+      );
+
+    if (options.overrideDefaultTrackingInterval) {
+      this.sqlite
+        .prepare(`
+          INSERT INTO settings (key, value) VALUES (?, ?)
+          ON CONFLICT(key) DO UPDATE SET value = excluded.value
+        `)
+        .run(
+          'trackingIntervalSeconds',
+          String(this.defaultTrackingIntervalSeconds),
+        );
+    }
 
     this.insertProductStmt = this.sqlite.prepare(`
       INSERT INTO products (user_id, url, title, brand, rating, review_count, currency, image_url, created_at)
@@ -585,7 +617,7 @@ export class AppDatabase {
     return {
       trackingIntervalSeconds: Number.isInteger(parsed)
         ? parsed
-        : DEFAULT_TRACKING_INTERVAL_SECONDS,
+        : this.defaultTrackingIntervalSeconds,
     };
   }
 

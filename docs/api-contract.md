@@ -104,7 +104,7 @@ Fetches the Lazada page, stores metadata + the first price point, and starts tra
 Runs a check immediately. `200 { "product": Product, "warning"?: string }`, `404` if not found or not owned, `422` on scrape failure.
 
 ### `GET /api/settings`
-`200 { "trackingIntervalSeconds": number }` — protected in multi-user mode; the interval is global to the installation.
+`200 { "trackingIntervalSeconds": number }` — protected in multi-user mode; the interval is global to the installation. When `DEFAULT_TRACKING_INTERVAL_MINUTES` is set, it is applied on startup and overrides the saved value. When unset, a new database starts at 5 minutes and existing saved values are preserved.
 
 ### `PUT /api/settings`
 Body: `{ "trackingIntervalSeconds": number }`

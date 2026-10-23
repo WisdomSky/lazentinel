@@ -261,7 +261,7 @@ async function handleSignOut() {
           >
             <button
               type="button"
-              class="flex h-9 items-center gap-1.5 rounded-full border border-border/65 bg-card/70 pl-1 pr-2 text-[11.5px] font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45 sm:gap-2 sm:pr-2.5"
+              class="flex h-9 items-center gap-1.5 rounded-full border border-border/65 bg-card/70 pl-1 pr-2 text-[11.5px] font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
               aria-haspopup="menu"
               :aria-expanded="userMenuOpen"
               :aria-label="`Account menu for ${authUser.email}`"
@@ -273,9 +273,6 @@ async function handleSignOut() {
                 aria-hidden="true"
               >
                 {{ userInitial }}
-              </span>
-              <span class="hidden max-w-[9.5rem] truncate sm:inline">
-                {{ authUser.email }}
               </span>
               <ChevronDown
                 class="size-3.5 shrink-0 text-muted-foreground/80 transition-transform duration-150"
