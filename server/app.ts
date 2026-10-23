@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
+import cookieParser from 'cookie-parser';
 import express, {
   type Express,
   type NextFunction,
@@ -7,18 +8,39 @@ import express, {
   type Response,
 } from 'express';
 import { z } from 'zod';
+import type { AuthServiceLike } from './auth.js';
 import {
   ConflictError,
   NotFoundError,
   ScrapeError,
+  UnauthorizedError,
   ValidationError,
 } from './errors.js';
 import type { ProductServiceLike } from './service.js';
 
+const SESSION_COOKIE = 'lazentinel_session';
+
 export interface CreateAppOptions {
   service: ProductServiceLike;
   clientDir?: string;
+  multiUser?: boolean;
+  auth?: AuthServiceLike | null;
+  cookieSecure?: boolean;
 }
+
+const authRegisterSchema = z.object({
+  email: z.string().trim().email('Enter a valid email address.').max(320),
+  password: z
+    .string()
+    .min(1, 'Password is required.')
+    .max(200, 'Password must be 200 characters or fewer.'),
+  confirmPassword: z.string().min(1, 'Please confirm your password.'),
+});
+
+const authLoginSchema = z.object({
+  email: z.string().trim().email('Enter a valid email address.').max(320),
+  password: z.string().min(1, 'Password is required.').max(200),
+});
 
 const addProductSchema = z.object({
   url: z
@@ -60,7 +82,17 @@ function asHttpishError(error: unknown): HttpishError | null {
   return typeof error === 'object' && error !== null ? (error as HttpishError) : null;
 }
 
-export function createApp({ service, clientDir }: CreateAppOptions): Express {
+export function createApp({
+  service,
+  clientDir,
+  multiUser = false,
+  auth = null,
+  cookieSecure = false,
+}: CreateAppOptions): Express {
+  if (multiUser && !auth) {
+    throw new Error('Multi-user mode requires an auth service.');
+  }
+
   const app = express();
   app.disable('x-powered-by');
 
@@ -70,35 +102,146 @@ export function createApp({ service, clientDir }: CreateAppOptions): Express {
     next();
   });
   app.use(express.json({ limit: '32kb' }));
+  app.use(cookieParser());
+
+  const cookieOptions = {
+    httpOnly: true,
+    sameSite: 'lax' as const,
+    secure: cookieSecure,
+    path: '/',
+  };
+
+  function readSessionToken(req: Request): string | null {
+    const token: unknown = req.cookies?.[SESSION_COOKIE];
+    return typeof token === 'string' && token.length > 0 ? token : null;
+  }
+
+  function currentAuthUser(req: Request) {
+    if (!multiUser || !auth) return null;
+    const token = readSessionToken(req);
+    return token ? auth.getSession(token) : null;
+  }
 
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok' });
   });
 
+  app.get('/api/auth/session', (req, res) => {
+    if (!multiUser) {
+      res.json({ multiUser: false, authenticated: true, user: null });
+      return;
+    }
+
+    const user = currentAuthUser(req);
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({
+      multiUser: true,
+      authenticated: user !== null,
+      user: user ? { email: user.email } : null,
+    });
+  });
+
+  app.post('/api/auth/register', (req, res) => {
+    if (!multiUser || !auth) {
+      res.status(404).json({ error: 'Multi-user mode is disabled.' });
+      return;
+    }
+    const parsed = authRegisterSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: firstIssue(parsed.error) });
+      return;
+    }
+
+    const user = auth.register(parsed.data);
+    res.status(201).json({ user: { email: user.email } });
+  });
+
+  app.post('/api/auth/login', (req, res) => {
+    if (!multiUser || !auth) {
+      res.status(404).json({ error: 'Multi-user mode is disabled.' });
+      return;
+    }
+    const parsed = authLoginSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: firstIssue(parsed.error) });
+      return;
+    }
+
+    const result = auth.login(parsed.data.email, parsed.data.password);
+    res.cookie(SESSION_COOKIE, result.token, {
+      ...cookieOptions,
+      expires: result.expiresAt,
+    });
+    res.json({ user: { email: result.user.email } });
+  });
+
+  app.post('/api/auth/logout', (req, res) => {
+    const token = readSessionToken(req);
+    if (multiUser && auth && token) {
+      auth.logout(token);
+    }
+    res.clearCookie(SESSION_COOKIE, cookieOptions);
+    res.status(204).end();
+  });
+
+  app.use('/api/products', (req, res, next) => {
+    if (!multiUser) {
+      res.locals.ownerId = 0;
+      next();
+      return;
+    }
+
+    const user = currentAuthUser(req);
+    if (!user) {
+      res.status(401).json({ error: 'Authentication required.' });
+      return;
+    }
+    res.locals.ownerId = user.id;
+    next();
+  });
+  app.use('/api/settings', (req, res, next) => {
+    if (!multiUser) {
+      res.locals.ownerId = 0;
+      next();
+      return;
+    }
+
+    const user = currentAuthUser(req);
+    if (!user) {
+      res.status(401).json({ error: 'Authentication required.' });
+      return;
+    }
+    res.locals.ownerId = user.id;
+    next();
+  });
+
   app.get('/api/products', async (_req, res) => {
-    const products = await service.listProducts();
+    const ownerId = res.locals.ownerId as number;
+    const products = await service.listProducts(ownerId);
     res.json({ products });
   });
 
   app.post('/api/products', async (req, res) => {
+    const ownerId = res.locals.ownerId as number;
     const parsed = addProductSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: firstIssue(parsed.error) });
       return;
     }
 
-    const result = await service.addProduct(parsed.data.url);
+    const result = await service.addProduct(parsed.data.url, ownerId);
     res.status(201).json(result);
   });
 
   app.delete('/api/products/:id', async (req, res) => {
+    const ownerId = res.locals.ownerId as number;
     const id = parseProductId(req.params.id);
     if (id === null) {
       res.status(400).json({ error: 'Product id must be a positive integer.' });
       return;
     }
 
-    const deleted = await service.deleteProduct(id);
+    const deleted = await service.deleteProduct(id, ownerId);
     if (!deleted) {
       res.status(404).json({ error: 'Product not found.' });
       return;
@@ -107,13 +250,14 @@ export function createApp({ service, clientDir }: CreateAppOptions): Express {
   });
 
   app.post('/api/products/:id/refresh', async (req, res) => {
+    const ownerId = res.locals.ownerId as number;
     const id = parseProductId(req.params.id);
     if (id === null) {
       res.status(400).json({ error: 'Product id must be a positive integer.' });
       return;
     }
 
-    const result = await service.refreshProduct(id);
+    const result = await service.refreshProduct(id, ownerId);
     if (!result) {
       res.status(404).json({ error: 'Product not found.' });
       return;
@@ -193,6 +337,10 @@ export function createApp({ service, clientDir }: CreateAppOptions): Express {
     }
     if (error instanceof NotFoundError) {
       res.status(404).json({ error: error.message });
+      return;
+    }
+    if (error instanceof UnauthorizedError) {
+      res.status(401).json({ error: error.message });
       return;
     }
 

@@ -1,4 +1,6 @@
 import { createApp } from './app.js';
+import { AuthDatabase } from './auth-db.js';
+import { AuthService } from './auth.js';
 import { LazadaBrowserRenderer } from './browser-renderer.js';
 import { loadConfig, loadLocalEnv } from './config.js';
 import { AppDatabase } from './db.js';
@@ -9,10 +11,18 @@ function main(): void {
   loadLocalEnv();
   const config = loadConfig(process.env);
   const db = new AppDatabase(config.databasePath);
+  const authDb = config.multiUser ? new AuthDatabase(config.authDatabasePath) : null;
+  const auth = authDb ? new AuthService(authDb) : null;
   const renderer = new LazadaBrowserRenderer({ logger: console });
   const scraper = new LazadaScraper({ renderer });
   const service = new ProductService(db, scraper);
-  const app = createApp({ service, clientDir: config.clientDist });
+  const app = createApp({
+    service,
+    clientDir: config.clientDist,
+    multiUser: config.multiUser,
+    auth,
+    cookieSecure: config.cookieSecure,
+  });
 
   service.start();
 
@@ -21,6 +31,12 @@ function main(): void {
     console.info(`[server] Lazentinel listening on http://localhost:${config.port}`);
     console.info(`[server] Database: ${config.databasePath}`);
     console.info(`[server] Tracking interval: ${trackingIntervalSeconds}s`);
+    console.info(
+      `[server] Multi-user mode: ${config.multiUser ? 'enabled' : 'disabled'}`,
+    );
+    if (config.multiUser) {
+      console.info(`[server] Auth database: ${config.authDatabasePath}`);
+    }
   });
 
   let shuttingDown = false;
@@ -37,6 +53,11 @@ function main(): void {
       } catch {
         // The database may already be closed.
       }
+      try {
+        authDb?.close();
+      } catch {
+        // The auth database may already be closed.
+      }
       process.exit(1);
     }, 10_000);
     forceTimer.unref();
@@ -52,6 +73,11 @@ function main(): void {
           db.close();
         } catch (closeError) {
           console.error('[server] Failed to close database:', closeError);
+        }
+        try {
+          authDb?.close();
+        } catch (closeError) {
+          console.error('[server] Failed to close auth database:', closeError);
         }
         clearTimeout(forceTimer);
         if (error) {
@@ -78,6 +104,11 @@ function main(): void {
       db.close();
     } catch {
       // The database may already be closed.
+    }
+    try {
+      authDb?.close();
+    } catch {
+      // The auth database may already be closed.
     }
     process.exit(1);
   });

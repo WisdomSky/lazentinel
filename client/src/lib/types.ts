@@ -40,3 +40,17 @@ export interface ProductResponse {
 export interface ApiError {
   error: string;
 }
+
+export interface AuthUser {
+  email: string;
+}
+
+export interface AuthSessionResponse {
+  multiUser: boolean;
+  authenticated: boolean;
+  user: AuthUser | null;
+}
+
+export interface AuthResponse {
+  user: AuthUser;
+}

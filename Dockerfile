@@ -33,6 +33,7 @@ WORKDIR /app
 ENV NODE_ENV=production \
     PORT=3000 \
     DATABASE_PATH=/app/data/lazentinel.db \
+    AUTH_DATABASE_PATH=/app/data/lazentinel-auth.db \
     CLIENT_DIST=/app/client/dist \
     PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 

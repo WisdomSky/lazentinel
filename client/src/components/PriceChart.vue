@@ -57,49 +57,49 @@ const trend = computed(() => {
 
 const palette = computed(() => {
   const dark = isDark.value;
-  const pointRing = dark ? '#18231e' : '#ffffff';
+  const pointRing = dark ? '#14194f' : '#ffffff';
 
   if (trend.value === 'down') {
     return dark
       ? {
-          line: '#34d399',
-          fillTop: 'rgba(52, 211, 153, 0.22)',
-          fillBottom: 'rgba(52, 211, 153, 0.008)',
+          line: '#ff5ca8',
+          fillTop: 'rgba(245, 0, 136, 0.28)',
+          fillBottom: 'rgba(245, 0, 136, 0.01)',
           pointRing,
         }
       : {
-          line: '#059669',
-          fillTop: 'rgba(5, 150, 105, 0.26)',
-          fillBottom: 'rgba(5, 150, 105, 0.01)',
+          line: '#f50088',
+          fillTop: 'rgba(245, 0, 136, 0.22)',
+          fillBottom: 'rgba(245, 0, 136, 0.008)',
           pointRing,
         };
   }
   if (trend.value === 'up') {
     return dark
       ? {
-          line: '#fb7185',
-          fillTop: 'rgba(251, 113, 133, 0.18)',
-          fillBottom: 'rgba(251, 113, 133, 0.008)',
+          line: '#ff646a',
+          fillTop: 'rgba(255, 100, 106, 0.18)',
+          fillBottom: 'rgba(255, 100, 106, 0.008)',
           pointRing,
         }
       : {
-          line: '#e11d48',
-          fillTop: 'rgba(225, 29, 72, 0.2)',
-          fillBottom: 'rgba(225, 29, 72, 0.01)',
+          line: '#c8060c',
+          fillTop: 'rgba(200, 6, 12, 0.17)',
+          fillBottom: 'rgba(200, 6, 12, 0.008)',
           pointRing,
         };
   }
   return dark
     ? {
-        line: '#94a3b8',
-        fillTop: 'rgba(148, 163, 184, 0.16)',
-        fillBottom: 'rgba(148, 163, 184, 0.008)',
+        line: '#9aa0ff',
+        fillTop: 'rgba(154, 160, 255, 0.15)',
+        fillBottom: 'rgba(154, 160, 255, 0.008)',
         pointRing,
       }
     : {
-        line: '#64748b',
-        fillTop: 'rgba(100, 116, 139, 0.2)',
-        fillBottom: 'rgba(100, 116, 139, 0.01)',
+        line: '#0f146d',
+        fillTop: 'rgba(15, 20, 109, 0.14)',
+        fillBottom: 'rgba(15, 20, 109, 0.008)',
         pointRing,
       };
 });
@@ -181,10 +181,12 @@ const chartData = computed<ChartData<'line'>>(() => ({
 
 const chartOptions = computed<ChartOptions<'line'>>(() => {
   const dark = isDark.value;
-  const axisColor = dark ? 'rgba(213, 231, 222, 0.62)' : 'rgba(52, 74, 64, 0.6)';
+  const axisColor = dark
+    ? 'rgba(213, 214, 255, 0.68)'
+    : 'rgba(15, 20, 109, 0.55)';
   const gridColor = dark
-    ? 'rgba(230, 244, 236, 0.075)'
-    : 'rgba(32, 64, 52, 0.075)';
+    ? 'rgba(226, 228, 255, 0.09)'
+    : 'rgba(15, 20, 109, 0.08)';
 
   return {
     responsive: true,
@@ -201,12 +203,12 @@ const chartOptions = computed<ChartOptions<'line'>>(() => {
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: dark ? '#eef7f1' : '#17211c',
-        titleColor: dark ? '#2c5e4b' : '#d1fae5',
-        bodyColor: dark ? '#14231c' : '#ffffff',
+        backgroundColor: dark ? '#f8f3fa' : '#0f146d',
+        titleColor: dark ? '#b00062' : '#ffd6ea',
+        bodyColor: dark ? '#171226' : '#ffffff',
         borderColor: dark
-          ? 'rgba(13, 40, 30, 0.08)'
-          : 'rgba(255, 255, 255, 0.08)',
+          ? 'rgba(245, 0, 136, 0.18)'
+          : 'rgba(245, 0, 136, 0.32)',
         borderWidth: 1,
         padding: 10,
         cornerRadius: 9,

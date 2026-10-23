@@ -61,10 +61,13 @@ export interface ProductServiceOptions {
 }
 
 export interface ProductServiceLike {
-  listProducts(): ProductDto[] | Promise<ProductDto[]>;
-  addProduct(url: string): Promise<AddProductResult>;
-  deleteProduct(id: number): boolean | Promise<boolean>;
-  refreshProduct(id: number): Promise<AddProductResult | null>;
+  listProducts(ownerId?: number): ProductDto[] | Promise<ProductDto[]>;
+  addProduct(url: string, ownerId?: number): Promise<AddProductResult>;
+  deleteProduct(id: number, ownerId?: number): boolean | Promise<boolean>;
+  refreshProduct(
+    id: number,
+    ownerId?: number,
+  ): Promise<AddProductResult | null>;
   getSettings(): Settings | Promise<Settings>;
   updateSettings(settings: Settings): Settings | Promise<Settings>;
 }
@@ -151,16 +154,16 @@ export class ProductService implements ProductServiceLike {
     this.now = options.now ?? (() => new Date());
   }
 
-  listProducts(): ProductDto[] {
+  listProducts(ownerId = 0): ProductDto[] {
     return this.db
-      .listProducts()
+      .listProducts(ownerId)
       .map((row) => this.buildProduct(row))
       .sort((left, right) => right.dropPercent - left.dropPercent || left.id - right.id);
   }
 
-  async addProduct(inputUrl: string): Promise<AddProductResult> {
+  async addProduct(inputUrl: string, ownerId = 0): Promise<AddProductResult> {
     const normalized = normalizeLazadaUrl(inputUrl);
-    this.assertNotTracked(normalized.url);
+    this.assertNotTracked(normalized.url, ownerId);
 
     let result: ScrapeResult;
     try {
@@ -174,7 +177,7 @@ export class ProductService implements ProductServiceLike {
     }
 
     const resolvedUrl = canonicalizeLazadaProductUrl(result.product.url) ?? normalized.url;
-    this.assertNotTracked(resolvedUrl);
+    this.assertNotTracked(resolvedUrl, ownerId);
 
     const checkedAt = this.now().toISOString();
     const price =
@@ -199,6 +202,7 @@ export class ProductService implements ProductServiceLike {
           createdAt: checkedAt,
         },
         price,
+        ownerId,
       );
     } catch (error) {
       if (isUniqueConstraintError(error)) {
@@ -231,14 +235,15 @@ export class ProductService implements ProductServiceLike {
     return warning ? { product, warning } : { product };
   }
 
-  deleteProduct(id: number): boolean {
-    this.clearTimer(id);
-    return this.db.deleteProduct(id);
+  deleteProduct(id: number, ownerId = 0): boolean {
+    const deleted = this.db.deleteProductForOwner(id, ownerId);
+    if (deleted) this.clearTimer(id);
+    return deleted;
   }
 
-  async refreshProduct(id: number): Promise<AddProductResult | null> {
+  async refreshProduct(id: number, ownerId = 0): Promise<AddProductResult | null> {
     const row = this.db.getProduct(id);
-    if (!row) return null;
+    if (!row || row.userId !== ownerId) return null;
 
     const outcome = await this.checkProduct(row, true);
     const updated = this.db.getProduct(id);
@@ -279,8 +284,8 @@ export class ProductService implements ProductServiceLike {
     this.timers.clear();
   }
 
-  private assertNotTracked(url: string): void {
-    if (this.db.getProductByUrl(url)) {
+  private assertNotTracked(url: string, ownerId: number): void {
+    if (this.db.getProductByUrl(url, ownerId)) {
       throw new ConflictError('This product is already being tracked.');
     }
   }

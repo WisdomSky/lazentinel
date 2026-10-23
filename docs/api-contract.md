@@ -34,13 +34,57 @@ interface Product {
 
 Products are ordered by `dropPercent` descending, then `id` ascending.
 
+## Multi-user mode
+
+`ENABLE_MULTIUSER` enables accounts only when its value is exactly `true`.
+When disabled, all product/settings endpoints are public and products belong to the
+single-user owner scope, exactly as before.
+
+When enabled:
+
+- Accounts and sessions live in a separate SQLite database
+  (`AUTH_DATABASE_PATH`, default `./data/lazentinel-auth.db`).
+- Passwords are stored in plaintext in the auth database, per the product
+  requirement. This is intentionally insecure for public deployments.
+- Every `/api/products` and `/api/settings` request requires a valid
+  `lazentinel_session` HTTP-only cookie; otherwise it returns `401`.
+- Products are scoped to the authenticated owner. List, add, delete and refresh
+  operate only on that owner's products. Other owners' product ids return `404`.
+- `(ownerId, url)` is unique, so different accounts can track the same Lazada URL
+  independently. Duplicate adds within one account return `409`.
+- Background tracking continues for all products regardless of which accounts are
+  online.
+
+## Auth endpoints
+
+### `GET /api/auth/session`
+Public. `200 { "multiUser": boolean, "authenticated": boolean, "user": { "email": string } | null }`.
+In single-user mode it returns `multiUser: false, authenticated: true, user: null`.
+
+### `POST /api/auth/register`
+Public when multi-user mode is enabled.
+Body: `{ "email": string, "password": string, "confirmPassword": string }`.
+
+Creates an account and returns `201 { "user": { "email": string } }`. It does **not**
+log the user in; the client returns to the sign-in screen. No email verification is
+performed. `400` for validation errors, `409` when the normalized email already exists.
+
+### `POST /api/auth/login`
+Public when enabled. Body: `{ "email": string, "password": string }`.
+
+On success returns `200 { "user": { "email": string } }` and sets the
+`lazentinel_session` cookie. Invalid credentials return `401`.
+
+### `POST /api/auth/logout`
+Clears and invalidates the current session, returning `204`.
+
 ## Endpoints
 
 ### `GET /api/health`
 `200 { "status": "ok" }`
 
 ### `GET /api/products`
-`200 { "products": Product[] }`
+`200 { "products": Product[] }` — scoped to the authenticated account when enabled.
 
 ### `POST /api/products`
 Body: `{ "url": string }`
@@ -49,17 +93,18 @@ Fetches the Lazada page, stores metadata + the first price point, and starts tra
 
 - `201 { "product": Product, "warning"?: string }` — product created. `warning` is set when the product page was read but its price was unavailable.
 - `400` invalid URL.
-- `409` product is already tracked.
+- `401` not authenticated (multi-user mode only).
+- `409` product is already tracked by this account.
 - `422` the URL could not be resolved to a readable Lazada product page.
 
 ### `DELETE /api/products/:id`
-`204` on success, `404` if not found.
+`204` on success, `404` if not found or not owned by the authenticated account.
 
 ### `POST /api/products/:id/refresh`
-Runs a check immediately. `200 { "product": Product, "warning"?: string }`, `404` if not found, `422` on scrape failure.
+Runs a check immediately. `200 { "product": Product, "warning"?: string }`, `404` if not found or not owned, `422` on scrape failure.
 
 ### `GET /api/settings`
-`200 { "trackingIntervalSeconds": number }`
+`200 { "trackingIntervalSeconds": number }` — protected in multi-user mode; the interval is global to the installation.
 
 ### `PUT /api/settings`
 Body: `{ "trackingIntervalSeconds": number }`

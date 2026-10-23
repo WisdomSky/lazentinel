@@ -459,4 +459,48 @@ describe('HTTP API', () => {
       rmSync(clientDir, { recursive: true, force: true });
     }
   });
+
+  describe('single-user compatibility', () => {
+    it('reports the single-user session and disables auth endpoints', async () => {
+      const session = await request(app).get('/api/auth/session').expect(200);
+      expect(session.body).toEqual({
+        multiUser: false,
+        authenticated: true,
+        user: null,
+      });
+
+      await request(app)
+        .post('/api/auth/register')
+        .send({
+          email: 'alice@example.com',
+          password: 'secret',
+          confirmPassword: 'secret',
+        })
+        .expect(404);
+      await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'alice@example.com', password: 'secret' })
+        .expect(404);
+    });
+
+    it('keeps product and settings endpoints accessible without cookies', async () => {
+      const products = await request(app).get('/api/products').expect(200);
+      expect(products.body).toEqual({ products: [] });
+
+      const settings = await request(app).get('/api/settings').expect(200);
+      expect(settings.body).toEqual({ trackingIntervalSeconds: 300 });
+
+      const created = await request(app)
+        .post('/api/products')
+        .send({ url: DEFAULT_PRODUCT_URL })
+        .expect(201);
+      expect(created.body.product.url).toBe(DEFAULT_PRODUCT_URL);
+
+      const updated = await request(app)
+        .put('/api/settings')
+        .send({ trackingIntervalSeconds: 60 })
+        .expect(200);
+      expect(updated.body).toEqual({ trackingIntervalSeconds: 60 });
+    });
+  });
 });

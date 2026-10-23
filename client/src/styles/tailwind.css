@@ -29,6 +29,13 @@
   --color-negative: var(--negative);
   --color-warning: var(--warning);
 
+  --color-brand-navy: var(--brand-navy);
+  --color-brand-pink: var(--brand-pink);
+  --color-brand-red: var(--brand-red);
+  --color-brand-orange: var(--brand-orange);
+  --color-brand-ink: var(--brand-ink);
+  --color-live: var(--live);
+
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -44,64 +51,74 @@
 :root {
   color-scheme: light;
 
-  --background: oklch(0.982 0.005 158);
-  --foreground: oklch(0.235 0.019 162);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.235 0.019 162);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.235 0.019 162);
-  --primary: oklch(0.553 0.126 162);
-  --primary-foreground: oklch(0.99 0.006 158);
-  --secondary: oklch(0.962 0.007 158);
-  --secondary-foreground: oklch(0.31 0.022 162);
-  --muted: oklch(0.962 0.006 158);
-  --muted-foreground: oklch(0.53 0.017 162);
-  --accent: oklch(0.945 0.016 162);
-  --accent-foreground: oklch(0.31 0.03 162);
-  --destructive: oklch(0.582 0.212 27);
-  --border: oklch(0.91 0.009 158);
-  --input: oklch(0.9 0.01 158);
-  --ring: oklch(0.64 0.11 162);
-  --positive: oklch(0.58 0.138 160);
-  --negative: oklch(0.585 0.205 25);
-  --warning: oklch(0.7 0.14 75);
-  --chart-1: oklch(0.58 0.135 162);
-  --chart-2: oklch(0.65 0.12 195);
-  --chart-3: oklch(0.6 0.14 250);
-  --chart-4: oklch(0.72 0.14 82);
-  --chart-5: oklch(0.65 0.17 35);
+  /* Lazada brand palette */
+  --brand-navy: #0f146d;
+  --brand-pink: #f50088;
+  --brand-red: #c8060c;
+  --brand-orange: #f57225;
+  --brand-ink: var(--brand-navy);
+
+  --live: rgba(70, 187, 0, 0.84);
+  --background: #fcf9fc;
+  --foreground: #171226;
+  --card: #ffffff;
+  --card-foreground: #171226;
+  --popover: #ffffff;
+  --popover-foreground: #171226;
+  --primary: var(--brand-navy);
+  --primary-foreground: #ffffff;
+  --secondary: #f6eff5;
+  --secondary-foreground: #2a1b2b;
+  --muted: #f6f1f7;
+  --muted-foreground: #675f70;
+  --accent: #fceaf5;
+  --accent-foreground: #790047;
+  --destructive: var(--brand-red);
+  --border: #e8dde5;
+  --input: #e0d2dd;
+  --ring: var(--brand-pink);
+  --positive: #b00062;
+  --negative: var(--brand-red);
+  --warning: #a64a00;
+  --chart-1: var(--brand-pink);
+  --chart-2: var(--brand-orange);
+  --chart-3: var(--brand-navy);
+  --chart-4: var(--brand-red);
+  --chart-5: #7b7fbe;
   --radius: 0.875rem;
 }
 
 .dark {
   color-scheme: dark;
 
-  --background: oklch(0.168 0.012 162);
-  --foreground: oklch(0.942 0.008 152);
-  --card: oklch(0.212 0.014 162);
-  --card-foreground: oklch(0.942 0.008 152);
-  --popover: oklch(0.232 0.015 162);
-  --popover-foreground: oklch(0.942 0.008 152);
-  --primary: oklch(0.72 0.14 162);
-  --primary-foreground: oklch(0.17 0.026 160);
-  --secondary: oklch(0.27 0.016 162);
-  --secondary-foreground: oklch(0.92 0.008 152);
-  --muted: oklch(0.255 0.014 162);
-  --muted-foreground: oklch(0.705 0.015 158);
-  --accent: oklch(0.285 0.022 162);
-  --accent-foreground: oklch(0.95 0.007 152);
-  --destructive: oklch(0.66 0.2 25);
-  --border: oklch(0.31 0.014 162);
-  --input: oklch(0.36 0.016 162);
-  --ring: oklch(0.7 0.11 162);
-  --positive: oklch(0.75 0.14 160);
-  --negative: oklch(0.71 0.18 22);
-  --warning: oklch(0.82 0.14 80);
-  --chart-1: oklch(0.73 0.13 162);
-  --chart-2: oklch(0.75 0.11 195);
-  --chart-3: oklch(0.72 0.12 250);
-  --chart-4: oklch(0.8 0.13 82);
-  --chart-5: oklch(0.73 0.16 35);
+  --brand-ink: #c9cfff;
+
+  --background: #080b2c;
+  --foreground: #f7f3fa;
+  --card: #14194f;
+  --card-foreground: #f7f3fa;
+  --popover: #191e5a;
+  --popover-foreground: #f7f3fa;
+  --primary: #4a52d0;
+  --primary-foreground: #ffffff;
+  --secondary: #1d225f;
+  --secondary-foreground: #ece8f7;
+  --muted: #1a1f58;
+  --muted-foreground: #bdbbe4;
+  --accent: #2e1a50;
+  --accent-foreground: #ffd9eb;
+  --destructive: #ff5d63;
+  --border: #2d3371;
+  --input: #383d80;
+  --ring: #ff3d9c;
+  --positive: #ff7bc0;
+  --negative: #ff646a;
+  --warning: #ffa46a;
+  --chart-1: #ff5ca8;
+  --chart-2: var(--brand-orange);
+  --chart-3: #9aa0ff;
+  --chart-4: #ff646a;
+  --chart-5: #ffc09a;
 }
 
 @layer base {

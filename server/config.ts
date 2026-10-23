@@ -8,7 +8,10 @@ export const MAX_TRACKING_INTERVAL_SECONDS = 86_400;
 export interface AppConfig {
   port: number;
   databasePath: string;
+  authDatabasePath: string;
   clientDist: string;
+  multiUser: boolean;
+  cookieSecure: boolean;
 }
 
 function parsePort(raw: string | undefined): number {
@@ -27,6 +30,12 @@ function resolveFromCwd(value: string): string {
 function parseDatabasePath(raw: string | undefined): string {
   const value = raw?.trim() || './data/lazentinel.db';
   // `:memory:` is a SQLite sentinel, not a filesystem path.
+  if (value === ':memory:') return value;
+  return resolveFromCwd(value);
+}
+
+function parseAuthDatabasePath(raw: string | undefined): string {
+  const value = raw?.trim() || './data/lazentinel-auth.db';
   if (value === ':memory:') return value;
   return resolveFromCwd(value);
 }
@@ -51,7 +60,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   return {
     port: parsePort(env.PORT),
     databasePath: parseDatabasePath(env.DATABASE_PATH),
+    authDatabasePath: parseAuthDatabasePath(env.AUTH_DATABASE_PATH),
     clientDist: parseClientDist(env.CLIENT_DIST),
+    // Exactly `true` enables multiuser support; every other value preserves
+    // the single-user behavior.
+    multiUser: env.ENABLE_MULTIUSER === 'true',
+    cookieSecure: env.COOKIE_SECURE === 'true',
   };
 }
 

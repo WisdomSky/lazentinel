@@ -5,6 +5,7 @@ import {
   CircleAlert,
   Clock3,
   Loader2,
+  LogOut,
   Moon,
   PackageSearch,
   PauseCircle,
@@ -12,6 +13,7 @@ import {
   RefreshCw,
   Settings,
   Sun,
+  UserRound,
 } from 'lucide-vue-next';
 import { Toaster, toast } from 'vue-sonner';
 import 'vue-sonner/style.css';
@@ -26,6 +28,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { getErrorMessage } from '@/lib/api';
 import { formatInterval } from '@/lib/interval';
+import { useAuth } from '@/composables/useAuth';
 import { useProducts } from '@/composables/useProducts';
 import { useTheme } from '@/composables/useTheme';
 
@@ -48,13 +51,18 @@ const {
 } = useProducts();
 
 const { isDark, toggleTheme } = useTheme();
+const {
+  multiUser: authMultiUser,
+  user: authUser,
+  logout,
+} = useAuth();
 const addDialogOpen = ref(false);
 const settingsDialogOpen = ref(false);
 const retrying = ref(false);
 
 const productCountLabel = computed(() => {
   const count = products.value.length;
-  return `${count} ${count === 1 ? 'product' : 'products'}`;
+  return `${count}`;
 });
 
 const intervalSummary = computed(() =>
@@ -110,7 +118,27 @@ async function handleRetry() {
     retrying.value = false;
   }
 }
+
+async function handleSignOut() {
+  try {
+    await logout();
+  } catch (error) {
+    toast.error('Could not sign out', {
+      description: getErrorMessage(error),
+    });
+  }
+}
 </script>
+
+<style lang="scss" >
+
+  #live-updates {
+    &[data-state="checked"] {
+      background-color: var(--live) !important;
+    }
+  }
+
+</style>
 
 <template>
   <div class="app-canvas">
@@ -129,13 +157,14 @@ async function handleRetry() {
               Lazentinel
             </p>
             <p class="hidden text-[10.5px] text-muted-foreground sm:block">
-              Lazada price sentinel
+
             </p>
           </div>
         </div>
 
         <div class="flex shrink-0 items-center gap-1.5 sm:gap-2">
           <Button
+            id="theme-selector"
             variant="outline"
             size="icon"
             class="rounded-full border-border/65 bg-card/70"
@@ -170,6 +199,7 @@ async function handleRetry() {
           </div>
 
           <Button
+            id="settings"
             variant="outline"
             size="icon"
             class="rounded-full border-border/65 bg-card/70"
@@ -190,34 +220,33 @@ async function handleRetry() {
         >
           <div class="max-w-2xl">
             <div
-              class="inline-flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-[0.18em] text-primary"
+              class="inline-flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-[0.18em] text-brand-ink"
             >
-              <span class="size-1.5 rounded-full bg-primary" aria-hidden="true" />
-              Lazada price intelligence
+              <span class="size-1.5 rounded-full bg-brand-orange" aria-hidden="true" />
+              24/7 product price trend surveillance
             </div>
 
-            <h1
-              class="mt-3 text-[30px] font-semibold leading-[1.08] tracking-[-0.04em] text-foreground sm:text-[40px]"
-            >
-              Know the moment a Lazada price drops.
-            </h1>
+<!--            <h1-->
+<!--              class="mt-3 text-[30px] font-semibold leading-[1.08] tracking-[-0.04em] text-foreground sm:text-[40px]"-->
+<!--            >-->
+<!--              Know the moment a Lazada price drops.-->
+<!--            </h1>-->
 
-            <p
-              class="mt-3 max-w-xl text-[13.5px] leading-6 text-muted-foreground sm:text-sm"
-            >
-              Keep a quiet watchlist of the products you care about. Add a link
-              once, then follow every price movement on a clean, live chart.
-            </p>
+<!--            <p-->
+<!--              class="mt-3 max-w-xl text-[13.5px] leading-6 text-muted-foreground sm:text-sm"-->
+<!--            >-->
+<!--                aaaa-->
+<!--            </p>-->
           </div>
 
           <div class="flex shrink-0 flex-wrap items-center gap-2">
             <Button
               size="lg"
-              class="shadow-[0_10px_24px_-14px_rgba(5,120,87,0.75)]"
+              class="shadow-[0_10px_24px_-14px_rgba(245,0,136,0.6)] text-white font-bold"
               @click="addDialogOpen = true"
             >
               <Plus aria-hidden="true" />
-              Add product
+               Add
             </Button>
           </div>
         </div>
@@ -226,7 +255,7 @@ async function handleRetry() {
           class="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2 text-[11.5px] text-muted-foreground"
         >
           <span class="font-medium text-foreground/70">
-            {{ productCountLabel }} tracked
+            {{ productCountLabel }} watched
           </span>
           <span class="hidden text-muted-foreground/35 sm:inline" aria-hidden="true">•</span>
           <span class="inline-flex items-center gap-1.5">
@@ -243,11 +272,31 @@ async function handleRetry() {
             {{ live ? 'Updating live' : 'Updates paused' }}
           </span>
         </div>
+
+        <div
+          v-if="authMultiUser"
+          class="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-muted-foreground"
+        >
+          <UserRound class="size-3.5 text-muted-foreground/70" aria-hidden="true" />
+          <span>
+            Signed in as
+            <span class="font-medium text-foreground/80">{{ authUser?.email }}</span>
+          </span>
+          <span class="text-muted-foreground/35" aria-hidden="true">•</span>
+          <button
+            type="button"
+            class="inline-flex items-center gap-1 text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
+            @click="handleSignOut"
+          >
+            <LogOut class="size-3.5" aria-hidden="true" />
+            Sign out
+          </button>
+        </div>
       </section>
 
       <div
         v-if="!live"
-        class="mt-5 flex flex-col gap-3 rounded-xl border border-border/75 bg-card/70 px-4 py-3 shadow-[0_1px_2px_rgba(20,45,34,0.03)] sm:flex-row sm:items-center sm:justify-between"
+        class="mt-5 flex flex-col gap-3 rounded-xl border border-border/75 bg-card/70 px-4 py-3 shadow-[0_1px_2px_rgba(23,18,38,0.03)] sm:flex-row sm:items-center sm:justify-between"
         role="status"
         aria-live="polite"
       >
@@ -351,10 +400,10 @@ async function handleRetry() {
 
         <section
           v-else-if="!products.length"
-          class="flex flex-col items-center rounded-2xl border border-dashed border-border bg-card/55 px-6 py-12 text-center shadow-[0_10px_30px_-28px_rgba(20,45,34,0.3)] sm:py-14"
+          class="flex flex-col items-center rounded-2xl border border-dashed border-border bg-card/55 px-6 py-12 text-center shadow-[0_10px_30px_-28px_rgba(15,20,109,0.3)] sm:py-14"
         >
           <span
-            class="grid size-12 place-items-center rounded-2xl border border-border/70 bg-card text-muted-foreground shadow-[0_1px_2px_rgba(20,45,34,0.04)]"
+            class="grid size-12 place-items-center rounded-2xl border border-border/70 bg-card text-muted-foreground shadow-[0_1px_2px_rgba(23,18,38,0.04)]"
           >
             <PackageSearch class="size-5" aria-hidden="true" />
           </span>
@@ -362,12 +411,11 @@ async function handleRetry() {
             No products on your watchlist yet
           </h2>
           <p class="mt-1.5 max-w-sm text-[12.5px] leading-5 text-muted-foreground">
-            Add a Lazada product link and we'll start recording its price right
-            away. Drop alerts and history appear as checks come in.
+            Add a Lazada product link to start price surveillance
           </p>
-          <Button class="mt-5" size="sm" @click="addDialogOpen = true">
+          <Button class="mt-5 text-white font-bold" size="sm" @click="addDialogOpen = true">
             <Plus aria-hidden="true" />
-            Add your first product
+            Add Product to Watchlist
           </Button>
         </section>
 
@@ -435,11 +483,7 @@ async function handleRetry() {
       >
         <p>Lazentinel is not affiliated with Lazada. Prices are read from public product pages.</p>
         <p class="inline-flex items-center gap-1.5 tabular-nums">
-          <Clock3 class="size-3.5 text-muted-foreground/70" aria-hidden="true" />
-          {{ footerInterval }}
-          <Badge variant="outline" class="ml-1 px-1.5 py-0 text-[10px]">
-            Server-side
-          </Badge>
+          <a href="https://paodayag.dev">paodayag.dev</a>
         </p>
       </footer>
     </main>

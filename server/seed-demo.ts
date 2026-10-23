@@ -94,10 +94,10 @@ function main(): void {
   const db = new AppDatabase(config.databasePath);
 
   try {
-    const existing = db.listProducts();
-    if (existing.length > 0 && !force) {
+    const existingCount = db.countProducts();
+    if (existingCount > 0 && !force) {
       console.error(
-        `Refusing to seed: database already contains ${existing.length} product(s). ` +
+        `Refusing to seed: database already contains ${existingCount} product(s). ` +
           'Re-run with --force to replace only the demo products.',
       );
       process.exitCode = 1;

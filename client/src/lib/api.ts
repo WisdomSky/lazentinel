@@ -1,4 +1,6 @@
 import type {
+  AuthResponse,
+  AuthSessionResponse,
   ProductResponse,
   ProductsResponse,
   Settings,
@@ -57,6 +59,7 @@ async function request<T>(
 ): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
     ...init,
+    credentials: 'same-origin',
     cache: 'no-store',
     headers: {
       Accept: 'application/json',
@@ -65,6 +68,9 @@ async function request<T>(
   });
 
   if (!response.ok) {
+    if (response.status === 401 && !path.startsWith('/api/auth/')) {
+      window.dispatchEvent(new Event('lazentinel:unauthorized'));
+    }
     throw new ApiError(await parseErrorMessage(response), response.status);
   }
 
@@ -107,4 +113,35 @@ export async function updateSettings(
     method: 'PUT',
     body: JSON.stringify({ trackingIntervalSeconds }),
   });
+}
+
+export async function getAuthSession(
+  signal?: AbortSignal,
+): Promise<AuthSessionResponse> {
+  return request<AuthSessionResponse>('/api/auth/session', { signal });
+}
+
+export async function login(
+  email: string,
+  password: string,
+): Promise<AuthResponse> {
+  return request<AuthResponse>('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+export async function register(
+  email: string,
+  password: string,
+  confirmPassword: string,
+): Promise<AuthResponse> {
+  return request<AuthResponse>('/api/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({ email, password, confirmPassword }),
+  });
+}
+
+export async function logout(): Promise<void> {
+  return request<void>('/api/auth/logout', { method: 'POST' });
 }

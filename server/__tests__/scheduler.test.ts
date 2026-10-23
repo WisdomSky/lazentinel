@@ -197,4 +197,21 @@ describe('ProductService scheduler', () => {
     expect(product?.currentPrice).toBe(80);
     expect(product?.history.map((point) => point.price)).toEqual([100, 80]);
   });
+
+  it('runs background checks for products owned by different accounts', async () => {
+    const owner0 = await service.addProduct(DEFAULT_PRODUCT_URL, 0);
+    const owner1 = await service.addProduct(DEFAULT_PRODUCT_URL, 1);
+    expect(scraper.calls).toHaveLength(2);
+
+    service.start();
+    expect(vi.getTimerCount()).toBe(2);
+
+    await advance(DEFAULT_INTERVAL_MS);
+
+    expect(scraper.calls).toHaveLength(4);
+    expect(db.getPriceRecords(owner0.product.id)).toHaveLength(2);
+    expect(db.getPriceRecords(owner1.product.id)).toHaveLength(2);
+    expect(service.listProducts(0)).toHaveLength(1);
+    expect(service.listProducts(1)).toHaveLength(1);
+  });
 });

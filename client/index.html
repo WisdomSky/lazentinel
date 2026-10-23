@@ -8,7 +8,15 @@
       content="Lazentinel watches Lazada product prices and records every change in a live, animated price history dashboard."
     />
     <meta name="application-name" content="Lazentinel" />
-    <meta id="theme-color-meta" name="theme-color" content="#f8faf8" />
+    <meta id="theme-color-meta" name="theme-color" content="#fcf9fc" />
+    <style>
+      html {
+        background-color: #fcf9fc;
+      }
+      html.dark {
+        background-color: #080b2c;
+      }
+    </style>
     <script>
       (() => {
         try {
@@ -18,7 +26,7 @@
           document.documentElement.classList.toggle('dark', dark);
           document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
           const meta = document.getElementById('theme-color-meta');
-          if (meta) meta.setAttribute('content', dark ? '#0d1512' : '#f8faf8');
+          if (meta) meta.setAttribute('content', dark ? '#080b2c' : '#fcf9fc');
         } catch {
           // Theme initialization is best-effort.
         }
@@ -26,7 +34,7 @@
     </script>
     <link
       rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23059669'/%3E%3Cpath d='M7 20.5l5.5-6 4 3.2L25 9' fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23F50088'/%3E%3Cpath d='M7 20.5l5.5-6 4 3.2L25 9' fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"
     />
     <title>Lazentinel — Lazada price sentinel</title>
   </head>

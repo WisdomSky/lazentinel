@@ -16,7 +16,10 @@ services:
       NODE_ENV: production
       PORT: 3008
       DATABASE_PATH: /app/data/lazentinel.db
+      AUTH_DATABASE_PATH: /app/data/lazentinel-auth.db
       CLIENT_DIST: /app/client/dist
+      ENABLE_MULTIUSER: ${ENABLE_MULTIUSER:-true}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
     volumes:
       - ./.lazentinel-data:/app/data
 

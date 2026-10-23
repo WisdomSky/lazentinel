@@ -228,6 +228,29 @@ describe('ProductService', () => {
     });
   });
 
+  describe('owner scoping', () => {
+    it('defaults to owner 0 and scopes rows and operations by owner', async () => {
+      const first = await service.addProduct(DEFAULT_PRODUCT_URL);
+      expect(db.getProduct(first.product.id)?.userId).toBe(0);
+      expect(service.listProducts().map((product) => product.id)).toEqual([
+        first.product.id,
+      ]);
+
+      const second = await service.addProduct(DEFAULT_PRODUCT_URL, 1);
+      expect(second.product.id).not.toBe(first.product.id);
+      expect(db.getProduct(second.product.id)?.userId).toBe(1);
+      expect(service.listProducts(1).map((product) => product.id)).toEqual([
+        second.product.id,
+      ]);
+
+      expect(await service.refreshProduct(first.product.id, 1)).toBeNull();
+      expect(service.deleteProduct(first.product.id, 1)).toBe(false);
+      expect(service.deleteProduct(second.product.id, 1)).toBe(true);
+      expect(service.deleteProduct(first.product.id, 0)).toBe(true);
+      expect(db.countProducts()).toBe(0);
+    });
+  });
+
   describe('deleteProduct', () => {
     it('returns false for unknown ids and cascades price records for real ones', async () => {
       expect(service.deleteProduct(999)).toBe(false);

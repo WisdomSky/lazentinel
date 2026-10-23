@@ -5,6 +5,7 @@ import { DEFAULT_TRACKING_INTERVAL_SECONDS } from './config.js';
 
 export interface ProductRow {
   id: number;
+  userId: number;
   url: string;
   title: string;
   brand: string | null;
@@ -67,8 +68,11 @@ interface PriceRangeRow {
   highest: number | null;
 }
 
+const SCHEMA_VERSION = 2;
+
 const PRODUCT_COLUMNS = `
   id,
+  user_id AS userId,
   url,
   title,
   brand,
@@ -81,10 +85,11 @@ const PRODUCT_COLUMNS = `
   last_error AS lastError
 `;
 
-const SCHEMA = `
+const PRODUCT_SCHEMA = `
   CREATE TABLE IF NOT EXISTS products (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    url TEXT NOT NULL UNIQUE,
+    user_id INTEGER NOT NULL DEFAULT 0,
+    url TEXT NOT NULL,
     title TEXT NOT NULL,
     brand TEXT,
     rating REAL,
@@ -95,7 +100,9 @@ const SCHEMA = `
     last_checked_at TEXT,
     last_error TEXT
   );
+`;
 
+const SUPPORTING_SCHEMA = `
   CREATE TABLE IF NOT EXISTS price_records (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
@@ -112,6 +119,14 @@ const SCHEMA = `
   );
 `;
 
+const PRODUCT_INDEXES = `
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_products_owner_url
+    ON products (user_id, url);
+
+  CREATE INDEX IF NOT EXISTS idx_products_owner
+    ON products (user_id);
+`;
+
 /**
  * Small synchronous wrapper around better-sqlite3. All SQL is prepared and
  * parameterised; multi-write operations are wrapped in transactions.
@@ -121,6 +136,7 @@ export class AppDatabase {
 
   private readonly insertProductStmt: Database.Statement<
     {
+      userId: number;
       url: string;
       title: string;
       brand: string | null;
@@ -134,11 +150,19 @@ export class AppDatabase {
   >;
 
   private readonly selectProductByIdStmt: Database.Statement<[number], ProductRow>;
-  private readonly selectProductByUrlStmt: Database.Statement<[string], ProductRow>;
+  private readonly selectProductByUrlStmt: Database.Statement<
+    [number, string],
+    ProductRow
+  >;
+  private readonly selectProductsByOwnerStmt: Database.Statement<[number], ProductRow>;
   private readonly selectAllProductsStmt: Database.Statement<[], ProductRow>;
   private readonly selectProductIdsStmt: Database.Statement<[], { id: number }>;
   private readonly deleteProductByIdStmt: Database.Statement<[number], unknown>;
-  private readonly deleteProductByUrlStmt: Database.Statement<[string], unknown>;
+  private readonly deleteProductForOwnerStmt: Database.Statement<
+    [number, number],
+    unknown
+  >;
+  private readonly deleteProductByUrlStmt: Database.Statement<[number, string], unknown>;
 
   private readonly updateMetadataStmt: Database.Statement<
     {
@@ -198,20 +222,23 @@ export class AppDatabase {
       this.sqlite.pragma('journal_mode = WAL');
       this.sqlite.pragma('synchronous = NORMAL');
     }
-    this.sqlite.exec(SCHEMA);
+    this.initializeSchema();
     this.sqlite
       .prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)')
       .run('trackingIntervalSeconds', String(DEFAULT_TRACKING_INTERVAL_SECONDS));
 
     this.insertProductStmt = this.sqlite.prepare(`
-      INSERT INTO products (url, title, brand, rating, review_count, currency, image_url, created_at)
-      VALUES (@url, @title, @brand, @rating, @reviewCount, @currency, @imageUrl, @createdAt)
+      INSERT INTO products (user_id, url, title, brand, rating, review_count, currency, image_url, created_at)
+      VALUES (@userId, @url, @title, @brand, @rating, @reviewCount, @currency, @imageUrl, @createdAt)
     `);
     this.selectProductByIdStmt = this.sqlite.prepare<[number], ProductRow>(
       `SELECT ${PRODUCT_COLUMNS} FROM products WHERE id = ?`,
     );
-    this.selectProductByUrlStmt = this.sqlite.prepare<[string], ProductRow>(
-      `SELECT ${PRODUCT_COLUMNS} FROM products WHERE url = ?`,
+    this.selectProductByUrlStmt = this.sqlite.prepare<[number, string], ProductRow>(
+      `SELECT ${PRODUCT_COLUMNS} FROM products WHERE user_id = ? AND url = ?`,
+    );
+    this.selectProductsByOwnerStmt = this.sqlite.prepare<[number], ProductRow>(
+      `SELECT ${PRODUCT_COLUMNS} FROM products WHERE user_id = ? ORDER BY id ASC`,
     );
     this.selectAllProductsStmt = this.sqlite.prepare<[], ProductRow>(
       `SELECT ${PRODUCT_COLUMNS} FROM products ORDER BY id ASC`,
@@ -222,8 +249,11 @@ export class AppDatabase {
     this.deleteProductByIdStmt = this.sqlite.prepare<[number], unknown>(
       'DELETE FROM products WHERE id = ?',
     );
-    this.deleteProductByUrlStmt = this.sqlite.prepare<[string], unknown>(
-      'DELETE FROM products WHERE url = ?',
+    this.deleteProductForOwnerStmt = this.sqlite.prepare<[number, number], unknown>(
+      'DELETE FROM products WHERE id = ? AND user_id = ?',
+    );
+    this.deleteProductByUrlStmt = this.sqlite.prepare<[number, string], unknown>(
+      'DELETE FROM products WHERE user_id = ? AND url = ?',
     );
     this.updateMetadataStmt = this.sqlite.prepare(`
       UPDATE products SET
@@ -300,14 +330,100 @@ export class AppDatabase {
     `);
   }
 
+  /**
+   * Creates or upgrades the product database. Version 2 introduces per-user
+   * ownership and replaces the old global URL uniqueness with a composite
+   * (user_id, url) index. Existing products are preserved with owner 0.
+   */
+  private initializeSchema(): void {
+    const productsTable = this.sqlite
+      .prepare<[], { name: string }>(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'products'",
+      )
+      .get();
+
+    if (!productsTable) {
+      this.sqlite.exec(PRODUCT_SCHEMA + SUPPORTING_SCHEMA + PRODUCT_INDEXES);
+      this.sqlite.pragma(`user_version = ${SCHEMA_VERSION}`);
+      return;
+    }
+
+    this.sqlite.exec(SUPPORTING_SCHEMA);
+    const version = Number(this.sqlite.pragma('user_version', { simple: true })) || 0;
+    const columns = this.sqlite
+      .prepare<[], { name: string }>('PRAGMA table_info(products)')
+      .all();
+    const hasUserId = columns.some((column) => column.name === 'user_id');
+    const tableDefinition = this.sqlite
+      .prepare<[], { sql: string }>(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'products'",
+      )
+      .get();
+    const hasLegacyUniqueUrl =
+      tableDefinition !== undefined &&
+      /url\s+TEXT\s+NOT NULL\s+UNIQUE/i.test(tableDefinition.sql);
+
+    if (!hasUserId || hasLegacyUniqueUrl) {
+      this.rebuildProductsForOwnership(hasUserId);
+    }
+
+    this.sqlite.exec(PRODUCT_INDEXES);
+    if (version < SCHEMA_VERSION) {
+      this.sqlite.pragma(`user_version = ${SCHEMA_VERSION}`);
+    }
+
+    const violations = this.sqlite.pragma('foreign_key_check') as unknown[];
+    if (violations.length > 0) {
+      throw new Error(
+        'Product database migration produced foreign key violations. Please back up and inspect the database.',
+      );
+    }
+  }
+
+  private rebuildProductsForOwnership(hasUserId: boolean): void {
+    const userExpression = hasUserId ? 'user_id' : '0';
+    const createProductsNew = PRODUCT_SCHEMA.replace(
+      'CREATE TABLE IF NOT EXISTS products',
+      'DROP TABLE IF EXISTS products_new;\n    CREATE TABLE products_new',
+    );
+
+    this.sqlite.pragma('foreign_keys = OFF');
+    try {
+      const migrate = this.sqlite.transaction(() => {
+        this.sqlite.exec(`
+          ${createProductsNew}
+          INSERT INTO products_new (
+            id, user_id, url, title, brand, rating, review_count, currency,
+            image_url, created_at, last_checked_at, last_error
+          )
+          SELECT
+            id, ${userExpression}, url, title, brand, rating, review_count,
+            currency, image_url, created_at, last_checked_at, last_error
+          FROM products;
+          DROP TABLE products;
+          ALTER TABLE products_new RENAME TO products;
+        `);
+      });
+      migrate();
+    } finally {
+      this.sqlite.pragma('foreign_keys = ON');
+    }
+  }
+
   now(): string {
     return new Date().toISOString();
   }
 
-  createProduct(input: CreateProductInput, initialPrice?: number | null): ProductRow {
+  createProduct(
+    input: CreateProductInput,
+    initialPrice?: number | null,
+    ownerId = 0,
+  ): ProductRow {
+    const userId = this.assertOwnerId(ownerId);
     const createdAt = input.createdAt ?? this.now();
     const create = this.sqlite.transaction(() => {
       const result = this.insertProductStmt.run({
+        userId,
         url: input.url,
         title: input.title,
         brand: input.brand ?? null,
@@ -330,11 +446,15 @@ export class AppDatabase {
     return this.selectProductByIdStmt.get(id) ?? null;
   }
 
-  getProductByUrl(url: string): ProductRow | null {
-    return this.selectProductByUrlStmt.get(url) ?? null;
+  getProductByUrl(url: string, ownerId = 0): ProductRow | null {
+    return this.selectProductByUrlStmt.get(this.assertOwnerId(ownerId), url) ?? null;
   }
 
-  listProducts(): ProductRow[] {
+  listProducts(ownerId = 0): ProductRow[] {
+    return this.selectProductsByOwnerStmt.all(this.assertOwnerId(ownerId));
+  }
+
+  listAllProducts(): ProductRow[] {
     return this.selectAllProductsStmt.all();
   }
 
@@ -353,8 +473,23 @@ export class AppDatabase {
     return this.deleteProductByIdStmt.run(id).changes > 0;
   }
 
-  deleteProductByUrl(url: string): boolean {
-    return this.deleteProductByUrlStmt.run(url).changes > 0;
+  deleteProductForOwner(id: number, ownerId: number): boolean {
+    return (
+      this.deleteProductForOwnerStmt.run(id, this.assertOwnerId(ownerId)).changes > 0
+    );
+  }
+
+  deleteProductByUrl(url: string, ownerId = 0): boolean {
+    return (
+      this.deleteProductByUrlStmt.run(this.assertOwnerId(ownerId), url).changes > 0
+    );
+  }
+
+  private assertOwnerId(ownerId: number): number {
+    if (!Number.isSafeInteger(ownerId) || ownerId < 0) {
+      throw new Error(`Invalid product owner id: ${ownerId}`);
+    }
+    return ownerId;
   }
 
   updateProductMetadata(id: number, metadata: ProductMetadata): void {

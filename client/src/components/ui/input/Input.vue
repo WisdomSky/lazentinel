@@ -45,7 +45,7 @@ defineExpose({
     @input="onInput"
     :class="
       cn(
-        'flex h-10 w-full rounded-lg border border-input bg-card px-3.5 py-2 text-sm text-foreground shadow-[0_1px_1px_rgba(20,45,34,0.03)] transition-[border-color,box-shadow] duration-150 placeholder:text-muted-foreground/65 focus-visible:border-primary/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35 disabled:cursor-not-allowed disabled:opacity-50 dark:shadow-none',
+        'flex h-10 w-full rounded-lg border border-input bg-card px-3.5 py-2 text-sm text-foreground shadow-[0_1px_1px_rgba(23,18,38,0.03)] transition-[border-color,box-shadow] duration-150 placeholder:text-muted-foreground/65 focus-visible:border-primary/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35 disabled:cursor-not-allowed disabled:opacity-50 dark:shadow-none',
         props.class,
       )
     "

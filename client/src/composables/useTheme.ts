@@ -1,8 +1,8 @@
 import { readonly, ref } from 'vue';
 
 const THEME_STORAGE_KEY = 'lazentinel:theme';
-const DARK_THEME_COLOR = '#0d1512';
-const LIGHT_THEME_COLOR = '#f8faf8';
+const DARK_THEME_COLOR = '#080b2c';
+const LIGHT_THEME_COLOR = '#fcf9fc';
 
 type Theme = 'light' | 'dark';
 

@@ -48,6 +48,14 @@ export class NotFoundError extends Error {
   }
 }
 
+/** Missing, invalid or expired authentication. */
+export class UnauthorizedError extends Error {
+  constructor(message = 'Authentication required.') {
+    super(message);
+    this.name = 'UnauthorizedError';
+  }
+}
+
 /** Prevents a database unique constraint from looking like a 500. */
 export function isUniqueConstraintError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
