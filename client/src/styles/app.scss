@@ -1,0 +1,267 @@
+$ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+$ease-spring: cubic-bezier(0.22, 0.9, 0.24, 1.12);
+
+.app-canvas {
+  min-height: 100dvh;
+  position: relative;
+  isolation: isolate;
+  overflow-x: clip;
+  background:
+    radial-gradient(1100px 620px at 50% -260px, color-mix(in oklab, var(--primary) 11%, transparent), transparent 70%),
+    radial-gradient(760px 420px at 100% 0%, oklch(0.88 0.05 190 / 0.22), transparent 72%),
+    var(--background);
+}
+
+.app-canvas::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.45;
+  background-image: radial-gradient(color-mix(in oklab, var(--foreground) 7%, transparent) 0.7px, transparent 0.7px);
+  background-size: 22px 22px;
+  mask-image: linear-gradient(to bottom, black, transparent 42%);
+}
+
+.site-header {
+  background: color-mix(in oklab, var(--background) 78%, transparent);
+  backdrop-filter: blur(18px) saturate(1.35);
+  -webkit-backdrop-filter: blur(18px) saturate(1.35);
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.8rem;
+  color: var(--primary-foreground);
+  background:
+    linear-gradient(145deg, oklch(0.68 0.14 162), oklch(0.46 0.12 170));
+  box-shadow:
+    0 8px 18px -8px oklch(0.45 0.12 162 / 0.7),
+    inset 0 1px 0 oklch(1 0 0 / 0.25);
+}
+
+.live-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: var(--positive);
+  box-shadow: 0 0 0 0 color-mix(in oklab, var(--positive) 45%, transparent);
+  animation: live-pulse 2.2s ease-out infinite;
+}
+
+.live-dot--paused {
+  background: var(--muted-foreground);
+  animation: none;
+  box-shadow: none;
+}
+
+@keyframes live-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--positive) 40%, transparent);
+  }
+  60% {
+    box-shadow: 0 0 0 6px color-mix(in oklab, var(--positive) 0%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--positive) 0%, transparent);
+  }
+}
+
+.product-list {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.product-card {
+  transition:
+    box-shadow 320ms ease,
+    border-color 320ms ease;
+}
+
+.product-card:hover {
+  border-color: color-mix(in oklab, var(--primary) 22%, var(--border));
+  box-shadow:
+    0 1px 2px oklch(0.3 0.02 160 / 0.04),
+    0 22px 50px -30px oklch(0.35 0.06 162 / 0.35);
+}
+
+.dark {
+  .app-canvas {
+    background:
+      radial-gradient(1100px 620px at 50% -260px, color-mix(in oklab, var(--primary) 10%, transparent), transparent 70%),
+      radial-gradient(760px 420px at 100% 0%, oklch(0.3 0.055 190 / 0.3), transparent 72%),
+      var(--background);
+  }
+
+  .app-canvas::before {
+    opacity: 0.2;
+    background-image: radial-gradient(color-mix(in oklab, var(--foreground) 12%, transparent) 0.7px, transparent 0.7px);
+  }
+
+  .brand-mark {
+    box-shadow:
+      0 8px 22px -8px oklch(0.22 0.08 162 / 0.8),
+      inset 0 1px 0 oklch(1 0 0 / 0.18);
+  }
+
+  .product-card:hover {
+    box-shadow:
+      0 1px 2px oklch(0 0 0 / 0.3),
+      0 24px 55px -30px oklch(0 0 0 / 0.85);
+  }
+}
+
+// These rules intentionally follow .product-card so their `transition`
+// declarations win during FLIP reorders and enter/leave animations.
+.product-list-move,
+.product-list-move.product-card {
+  transition: transform 620ms $ease-out-expo;
+  will-change: transform;
+}
+
+.product-list-enter-active,
+.product-list-enter-active.product-card {
+  transition:
+    opacity 380ms ease,
+    transform 560ms $ease-out-expo;
+}
+
+.product-list-leave-active,
+.product-list-leave-active.product-card {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 0;
+  transition:
+    opacity 200ms ease,
+    transform 300ms ease;
+}
+
+.product-list-enter-from {
+  opacity: 0;
+  transform: translateY(16px) scale(0.985);
+}
+
+.product-list-leave-to {
+  opacity: 0;
+  transform: translateY(-6px) scale(0.985);
+}
+
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type='number'] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.chart-frame {
+  position: relative;
+  width: 100%;
+  height: 210px;
+}
+
+.chart-frame canvas {
+  display: block;
+}
+
+.drop-badge {
+  animation: badge-in 380ms $ease-spring both;
+}
+
+@keyframes badge-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.star-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+  color: oklch(0.77 0.16 81);
+
+  svg {
+    width: 0.9rem;
+    height: 0.9rem;
+    stroke-width: 0;
+    fill: currentColor;
+  }
+
+  svg.is-empty {
+    fill: color-mix(in oklab, var(--muted-foreground) 22%, transparent);
+  }
+}
+
+.settings-preset {
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease;
+
+  &[aria-pressed='true'] {
+    border-color: color-mix(in oklab, var(--primary) 45%, var(--border));
+    background: color-mix(in oklab, var(--primary) 9%, var(--card));
+    color: var(--primary);
+  }
+}
+
+.dialog-overlay-enter-active,
+.dialog-overlay-leave-active {
+  transition: opacity 180ms ease;
+}
+
+.dialog-overlay-enter-from,
+.dialog-overlay-leave-to {
+  opacity: 0;
+}
+
+.thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--foreground) 20%, transparent) transparent;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--foreground) 18%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .chart-frame {
+    height: 180px;
+  }
+}

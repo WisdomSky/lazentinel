@@ -1,0 +1,13 @@
+node_modules
+client/node_modules
+dist
+client/dist
+data
+.git
+.gitignore
+.env
+.DS_Store
+*.log
+coverage
+docs
+README.md

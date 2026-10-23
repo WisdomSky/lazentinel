@@ -1,0 +1,22 @@
+name: lazentinel
+
+services:
+  app:
+    image: wisdomsky/lazentinel:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lazentinel
+    restart: unless-stopped
+    init: true
+    shm_size: "1gb"
+    ports:
+      - "${APP_PORT:-3008}:3008"
+    environment:
+      NODE_ENV: production
+      PORT: 3008
+      DATABASE_PATH: /app/data/lazentinel.db
+      CLIENT_DIST: /app/client/dist
+    volumes:
+      - ./.lazentinel-data:/app/data
+
