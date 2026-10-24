@@ -46,7 +46,6 @@ export function useProducts() {
   const loadingError = ref<string | null>(null);
   const pollingError = ref<string | null>(null);
   const live = ref(readLivePreference());
-  const now = ref(Date.now());
   const deletingIds = ref<Set<number>>(new Set());
   const refreshingIds = ref<Set<number>>(new Set());
 
@@ -98,7 +97,6 @@ export function useProducts() {
       if (token !== pollGeneration || isUnmounted || !live.value) return;
 
       products.value = response.products;
-      now.value = Date.now();
       pollingError.value = null;
       loadingError.value = null;
     } catch (error) {
@@ -171,7 +169,6 @@ export function useProducts() {
 
       products.value = productsResponse.products;
       settings.value = settingsResponse;
-      now.value = Date.now();
 
       if (live.value) {
         // The initial load just fetched; let the next poll come one second later.
@@ -227,7 +224,6 @@ export function useProducts() {
     products.value = sortByBackendOrder(next);
 
     if (live.value) {
-      now.value = Date.now();
       resyncPolling();
     }
 
@@ -256,7 +252,6 @@ export function useProducts() {
       );
 
       if (live.value) {
-        now.value = Date.now();
         resyncPolling();
       }
 
@@ -313,7 +308,6 @@ export function useProducts() {
     loadingError,
     pollingError,
     live,
-    now,
     deletingIds,
     refreshingIds,
     setLive,

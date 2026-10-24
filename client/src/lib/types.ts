@@ -15,6 +15,8 @@ export interface Product {
   createdAt: string;
   lastCheckedAt: string | null;
   lastError: string | null;
+  nextCheckAt: string | null;
+  checking: boolean;
   currentPrice: number | null;
   previousPrice: number | null;
   priceChange: number | null;

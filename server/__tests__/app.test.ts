@@ -26,6 +26,8 @@ const PRODUCT_KEYS = [
   'createdAt',
   'lastCheckedAt',
   'lastError',
+  'nextCheckAt',
+  'checking',
   'currentPrice',
   'previousPrice',
   'priceChange',
@@ -42,6 +44,8 @@ function expectProductShape(product: Record<string, unknown>): void {
   expect(typeof product.title).toBe('string');
   expect(typeof product.currency).toBe('string');
   expect(typeof product.dropPercent).toBe('number');
+  expect(typeof product.checking).toBe('boolean');
+  expect(product.nextCheckAt === null || typeof product.nextCheckAt === 'string').toBe(true);
   expect(Array.isArray(product.history)).toBe(true);
   for (const point of product.history as Array<Record<string, unknown>>) {
     expect(Object.keys(point).sort()).toEqual(['price', 'recordedAt']);

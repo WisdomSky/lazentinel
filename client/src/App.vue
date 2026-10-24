@@ -37,7 +37,6 @@ const {
   loadingError,
   pollingError,
   live,
-  now,
   deletingIds,
   refreshingIds,
   setLive,
@@ -527,7 +526,6 @@ async function handleSignOut() {
               v-for="product in products"
               :key="product.id"
               :product="product"
-              :now="now"
               :refreshing="refreshingIds.has(product.id)"
               :deleting="deletingIds.has(product.id)"
               @refresh="handleRefresh"

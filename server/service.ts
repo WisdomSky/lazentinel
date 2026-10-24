@@ -26,6 +26,10 @@ export interface ProductDto {
   createdAt: string;
   lastCheckedAt: string | null;
   lastError: string | null;
+  /** When the next background check is scheduled, or null while checking. */
+  nextCheckAt: string | null;
+  /** True while a background or manual check is in flight. */
+  checking: boolean;
   currentPrice: number | null;
   previousPrice: number | null;
   priceChange: number | null;
@@ -88,7 +92,12 @@ function round2(value: number): number {
 }
 
 /** Builds the public DTO from a stored row and its price summary. */
-export function toProductDto(row: ProductRow, summary: PriceSummary): ProductDto {
+export function toProductDto(
+  row: ProductRow,
+  summary: PriceSummary,
+  nextCheckAt: string | null = null,
+  checking = false,
+): ProductDto {
   const { currentPrice, previousPrice } = summary;
   const priceChange =
     currentPrice !== null && previousPrice !== null ? round2(currentPrice - previousPrice) : null;
@@ -109,6 +118,8 @@ export function toProductDto(row: ProductRow, summary: PriceSummary): ProductDto
     createdAt: row.createdAt,
     lastCheckedAt: row.lastCheckedAt,
     lastError: row.lastError,
+    nextCheckAt,
+    checking,
     currentPrice,
     previousPrice,
     priceChange,
@@ -135,6 +146,7 @@ export class ProductService implements ProductServiceLike {
   private readonly now: () => Date;
 
   private readonly timers = new Map<number, ReturnType<typeof setTimeout>>();
+  private readonly nextChecks = new Map<number, number>();
   private readonly inFlight = new Map<number, Promise<CheckOutcome>>();
   private running = false;
 
@@ -266,6 +278,7 @@ export class ProductService implements ProductServiceLike {
       clearTimeout(timer);
     }
     this.timers.clear();
+    this.nextChecks.clear();
   }
 
   private assertNotTracked(url: string, ownerId: number): void {
@@ -293,10 +306,13 @@ export class ProductService implements ProductServiceLike {
 
   private scheduleProduct(id: number, delayMs: number): void {
     this.clearTimer(id);
+    const delay = Math.max(0, delayMs);
+    this.nextChecks.set(id, this.now().getTime() + delay);
     const timer = setTimeout(() => {
       this.timers.delete(id);
+      this.nextChecks.delete(id);
       void this.runScheduledCheck(id);
-    }, Math.max(0, delayMs));
+    }, delay);
     timer.unref?.();
     this.timers.set(id, timer);
   }
@@ -307,6 +323,7 @@ export class ProductService implements ProductServiceLike {
       clearTimeout(timer);
       this.timers.delete(id);
     }
+    this.nextChecks.delete(id);
   }
 
   private async runScheduledCheck(id: number): Promise<void> {
@@ -392,7 +409,13 @@ export class ProductService implements ProductServiceLike {
   }
 
   private buildProduct(row: ProductRow): ProductDto {
-    return toProductDto(row, this.db.getPriceSummary(row.id, 500));
+    const nextCheck = this.nextChecks.get(row.id);
+    return toProductDto(
+      row,
+      this.db.getPriceSummary(row.id, 500),
+      nextCheck === undefined ? null : new Date(nextCheck).toISOString(),
+      this.inFlight.has(row.id),
+    );
   }
 }
 

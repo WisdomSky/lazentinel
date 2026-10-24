@@ -22,6 +22,8 @@ interface Product {
   createdAt: string;
   lastCheckedAt: string | null;
   lastError: string | null;
+  nextCheckAt: string | null; // scheduled background check; null while checking
+  checking: boolean; // true while a background or manual check is in flight
   currentPrice: number | null;
   previousPrice: number | null; // most recent earlier price that differs from currentPrice
   priceChange: number | null; // currentPrice - previousPrice

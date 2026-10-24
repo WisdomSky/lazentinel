@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import {
   Clock3,
   ExternalLink,
+  Loader2,
   Package,
   RefreshCw,
   Trash2,
@@ -16,16 +17,15 @@ import { Card } from '@/components/ui/card';
 import PriceChart from '@/components/PriceChart.vue';
 import StarRating from '@/components/StarRating.vue';
 import {
+  formatCountdown,
   formatDrop,
   formatPrice,
-  formatRelativeTime,
   formatReviewCount,
 } from '@/lib/format';
 import type { Product } from '@/lib/types';
 
 interface ProductCardProps {
   product: Product;
-  now: number;
   refreshing: boolean;
   deleting: boolean;
 }
@@ -38,6 +38,19 @@ const emit = defineEmits<{
 }>();
 
 const imageFailed = ref(false);
+const clockNow = ref(Date.now());
+let clockTimer: ReturnType<typeof setInterval> | null = null;
+
+onMounted(() => {
+  clockTimer = setInterval(() => {
+    clockNow.value = Date.now();
+  }, 1_000);
+});
+
+onBeforeUnmount(() => {
+  if (clockTimer) clearInterval(clockTimer);
+  clockTimer = null;
+});
 
 watch(
   () => props.product.imageUrl,
@@ -58,6 +71,29 @@ const hasPreviousPrice = computed(
 );
 
 const historyCount = computed(() => props.product.history.length);
+
+const nextCheckAt = computed(() => {
+  if (props.product.nextCheckAt === null) return null;
+  const timestamp = new Date(props.product.nextCheckAt).getTime();
+  return Number.isFinite(timestamp) ? timestamp : null;
+});
+
+const countdownMs = computed(() => {
+  if (nextCheckAt.value === null) return null;
+  return Math.max(0, nextCheckAt.value - clockNow.value);
+});
+
+// The server tells us when a background or manual check is actually running.
+const isChecking = computed(
+  () => props.refreshing || props.product.checking,
+);
+
+const checkStatusLabel = computed(() => {
+  if (isChecking.value) return 'Now checking the current price...';
+  if (countdownMs.value === null) return 'Awaiting the next price check.';
+  if (countdownMs.value <= 0) return 'Next price check is due now.';
+  return `${formatCountdown(countdownMs.value)} until next check.`;
+});
 </script>
 
 <template>
@@ -229,9 +265,21 @@ const historyCount = computed(() => props.product.history.length);
       <div
         class="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 px-0.5 text-[11.5px] text-muted-foreground"
       >
-        <span class="inline-flex items-center gap-1.5">
-          <Clock3 class="size-3.5 text-muted-foreground/70" aria-hidden="true" />
-          Last checked {{ formatRelativeTime(product.lastCheckedAt, now) }}
+        <span
+          class="inline-flex items-center gap-1.5"
+          :aria-live="isChecking ? 'polite' : 'off'"
+        >
+          <Loader2
+            v-if="isChecking"
+            class="size-3.5 animate-spin text-muted-foreground/70"
+            aria-hidden="true"
+          />
+          <Clock3
+            v-else
+            class="size-3.5 text-muted-foreground/70"
+            aria-hidden="true"
+          />
+          <span class="tabular-nums">{{ checkStatusLabel }}</span>
         </span>
 
         <span

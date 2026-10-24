@@ -46,6 +46,7 @@ services:
 - Add any Lazada product by URL (Singapore, Malaysia, Thailand, Philippines, Indonesia and Vietnam).
 - Tracks the **displayed sale price** — not the struck-through original/list price — plus the live rating and review count.
 - Background tracking on an interval configured with `TRACKING_INTERVAL_MINUTES` (default **5 minutes**, minimum 5 seconds).
+- Real-time countdown to the next check, with a checking indicator while a price check is running.
 - SQLite persistence — products and full price history survive restarts.
 - Product cards with title, brand, rendered stars, review count, current price, drop badge and a chronological price chart.
 - Live reordering by price drop percentage, animated with a FLIP transition so cards can be followed while they move.
