@@ -15,7 +15,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3008
-      DEFAULT_TRACKING_INTERVAL_MINUTES: ${DEFAULT_TRACKING_INTERVAL_MINUTES:-}
+      TRACKING_INTERVAL_MINUTES: ${TRACKING_INTERVAL_MINUTES:-}
       DATABASE_PATH: /app/data/lazentinel.db
       AUTH_DATABASE_PATH: /app/data/lazentinel-auth.db
       CLIENT_DIST: /app/client/dist

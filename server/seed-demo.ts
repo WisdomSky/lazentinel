@@ -92,8 +92,7 @@ function main(): void {
   loadLocalEnv();
   const config = loadConfig(process.env);
   const db = new AppDatabase(config.databasePath, {
-    defaultTrackingIntervalSeconds: config.defaultTrackingIntervalSeconds,
-    overrideDefaultTrackingInterval: config.defaultTrackingIntervalFromEnv,
+    trackingIntervalSeconds: config.trackingIntervalSeconds,
   });
 
   try {

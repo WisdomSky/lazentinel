@@ -106,15 +106,6 @@ export async function getSettings(signal?: AbortSignal): Promise<Settings> {
   return request<Settings>('/api/settings', { signal });
 }
 
-export async function updateSettings(
-  trackingIntervalSeconds: number,
-): Promise<Settings> {
-  return request<Settings>('/api/settings', {
-    method: 'PUT',
-    body: JSON.stringify({ trackingIntervalSeconds }),
-  });
-}
-
 export async function getAuthSession(
   signal?: AbortSignal,
 ): Promise<AuthSessionResponse> {

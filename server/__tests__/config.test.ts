@@ -54,56 +54,35 @@ describe('loadConfig multi-user settings', () => {
   });
 });
 
-describe('loadConfig default tracking interval', () => {
+describe('loadConfig tracking interval', () => {
   it('falls back to 5 minutes when unset or empty', () => {
-    expect(loadConfig({}).defaultTrackingIntervalSeconds).toBe(300);
-    expect(loadConfig({}).defaultTrackingIntervalFromEnv).toBe(false);
+    expect(loadConfig({}).trackingIntervalSeconds).toBe(300);
     expect(
-      loadConfig({ DEFAULT_TRACKING_INTERVAL_MINUTES: '' })
-        .defaultTrackingIntervalSeconds,
+      loadConfig({ TRACKING_INTERVAL_MINUTES: '' }).trackingIntervalSeconds,
     ).toBe(300);
     expect(
-      loadConfig({ DEFAULT_TRACKING_INTERVAL_MINUTES: '' })
-        .defaultTrackingIntervalFromEnv,
-    ).toBe(false);
-    expect(
-      loadConfig({ DEFAULT_TRACKING_INTERVAL_MINUTES: '   ' })
-        .defaultTrackingIntervalSeconds,
+      loadConfig({ TRACKING_INTERVAL_MINUTES: '   ' }).trackingIntervalSeconds,
     ).toBe(300);
-    expect(
-      loadConfig({ DEFAULT_TRACKING_INTERVAL_MINUTES: '   ' })
-        .defaultTrackingIntervalFromEnv,
-    ).toBe(false);
   });
 
   it('converts a custom value from minutes to seconds', () => {
     expect(
-      loadConfig({ DEFAULT_TRACKING_INTERVAL_MINUTES: '5' })
-        .defaultTrackingIntervalSeconds,
+      loadConfig({ TRACKING_INTERVAL_MINUTES: '5' }).trackingIntervalSeconds,
     ).toBe(300);
     expect(
-      loadConfig({ DEFAULT_TRACKING_INTERVAL_MINUTES: '5' })
-        .defaultTrackingIntervalFromEnv,
-    ).toBe(true);
-    expect(
-      loadConfig({ DEFAULT_TRACKING_INTERVAL_MINUTES: '10' })
-        .defaultTrackingIntervalSeconds,
+      loadConfig({ TRACKING_INTERVAL_MINUTES: '10' }).trackingIntervalSeconds,
     ).toBe(600);
     expect(
-      loadConfig({ DEFAULT_TRACKING_INTERVAL_MINUTES: '0.5' })
-        .defaultTrackingIntervalSeconds,
+      loadConfig({ TRACKING_INTERVAL_MINUTES: '0.5' }).trackingIntervalSeconds,
     ).toBe(30);
     expect(
-      loadConfig({ DEFAULT_TRACKING_INTERVAL_MINUTES: '5.5' })
-        .defaultTrackingIntervalSeconds,
+      loadConfig({ TRACKING_INTERVAL_MINUTES: '5.5' }).trackingIntervalSeconds,
     ).toBe(330);
     expect(
-      loadConfig({ DEFAULT_TRACKING_INTERVAL_MINUTES: '1440' })
-        .defaultTrackingIntervalSeconds,
+      loadConfig({ TRACKING_INTERVAL_MINUTES: '1440' }).trackingIntervalSeconds,
     ).toBe(86_400);
     expect(
-      loadConfig({ DEFAULT_TRACKING_INTERVAL_MINUTES: '0.0833' })
-        .defaultTrackingIntervalSeconds,
+      loadConfig({ TRACKING_INTERVAL_MINUTES: '0.0833' }).trackingIntervalSeconds,
     ).toBe(5);
   });
 
@@ -111,8 +90,8 @@ describe('loadConfig default tracking interval', () => {
     'rejects invalid value %j',
     (value) => {
       expect(() =>
-        loadConfig({ DEFAULT_TRACKING_INTERVAL_MINUTES: value }),
-      ).toThrow(/DEFAULT_TRACKING_INTERVAL_MINUTES/);
+        loadConfig({ TRACKING_INTERVAL_MINUTES: value }),
+      ).toThrow(/TRACKING_INTERVAL_MINUTES/);
     },
   );
 });

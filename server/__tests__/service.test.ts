@@ -1,12 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AppDatabase } from '../db.js';
-import { ConflictError, ScrapeError, ValidationError } from '../errors.js';
+import { ConflictError, ScrapeError } from '../errors.js';
 import { DISPLAYED_PRICE_UNAVAILABLE_WARNING } from '../scraper.js';
 import {
   PRICE_UNAVAILABLE_WARNING,
   ProductService,
 } from '../service.js';
-import type { Settings } from '../service.js';
 import {
   DEFAULT_PRODUCT_URL,
   FakeScraper,
@@ -464,46 +463,8 @@ describe('ProductService', () => {
   });
 
   describe('settings', () => {
-    it('defaults to 300 seconds', () => {
+    it('reads the configured interval from the database', () => {
       expect(service.getSettings()).toEqual({ trackingIntervalSeconds: 300 });
-    });
-
-    it('persists a valid interval and accepts the boundaries', () => {
-      expect(service.updateSettings({ trackingIntervalSeconds: 60 })).toEqual({
-        trackingIntervalSeconds: 60,
-      });
-      expect(service.getSettings()).toEqual({ trackingIntervalSeconds: 60 });
-      expect(db.getSettings()).toEqual({ trackingIntervalSeconds: 60 });
-
-      const secondService = new ProductService(db, new FakeScraper(), {
-        logger: silentLogger,
-      });
-      expect(secondService.getSettings()).toEqual({ trackingIntervalSeconds: 60 });
-      secondService.stop();
-
-      expect(service.updateSettings({ trackingIntervalSeconds: 5 })).toEqual({
-        trackingIntervalSeconds: 5,
-      });
-      expect(service.updateSettings({ trackingIntervalSeconds: 86_400 })).toEqual({
-        trackingIntervalSeconds: 86_400,
-      });
-    });
-
-    it.each([4, 4.9, 0, -5, 86_401, 5.5, Number.NaN, Number.POSITIVE_INFINITY, 300.0001])(
-      'rejects invalid interval %d with ValidationError and leaves settings unchanged',
-      (value) => {
-        expect(() => service.updateSettings({ trackingIntervalSeconds: value })).toThrow(
-          ValidationError,
-        );
-        expect(service.getSettings()).toEqual({ trackingIntervalSeconds: 300 });
-      },
-    );
-
-    it('rejects missing and non-numeric intervals with ValidationError', () => {
-      expect(() => service.updateSettings({} as unknown as Settings)).toThrow(ValidationError);
-      expect(() =>
-        service.updateSettings({ trackingIntervalSeconds: '60' as unknown as number }),
-      ).toThrow(ValidationError);
     });
   });
 });

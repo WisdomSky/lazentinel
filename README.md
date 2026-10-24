@@ -10,11 +10,11 @@
 
 - Add any Lazada product by URL (Singapore, Malaysia, Thailand, Philippines, Indonesia and Vietnam).
 - Tracks the **displayed sale price** — not the struck-through original/list price — plus the live rating and review count.
-- Background tracking on an interval you choose from Settings (default **300 seconds**, minimum 5).
+- Background tracking on an interval configured with `TRACKING_INTERVAL_MINUTES` (default **5 minutes**, minimum 5 seconds).
 - SQLite persistence — products and full price history survive restarts.
 - Product cards with title, brand, rendered stars, review count, current price, drop badge and a chronological price chart.
 - Live reordering by price drop percentage, animated with a FLIP transition so cards can be followed while they move.
-- A **Live** switch next to Settings that pauses all browser updates (charts and card order) while the server keeps tracking.
+- A **Live** switch in the header that pauses all browser updates (charts and card order) while the server keeps tracking.
 - Add, delete and "check now" actions, with clear loading, warning and error states.
 - Optional multi-user mode with accounts, a login screen, and private per-account watchlists.
 - Light and dark themes with a system-aware initial preference and a header toggle.
@@ -41,8 +41,8 @@ Only the exact value `true` enables it. When enabled:
 - Background tracking continues for every stored product whether its owner is
   signed in or not.
 - Clicking **Sign out** returns to the login screen.
-- The tracking interval setting remains global for the installation and is read-only
-  while multi-user mode is enabled.
+- The tracking interval is configured with `TRACKING_INTERVAL_MINUTES` and is
+  read-only in the application.
 
 Accounts and sessions are stored in a **separate SQLite database**
 (`./data/lazentinel-auth.db`, configurable via `AUTH_DATABASE_PATH`), while products
@@ -190,7 +190,7 @@ build, and semantic tags for version tags such as `v1.2.3`.
 | Variable         | Default               | Description                                  |
 | ---------------- | --------------------- | -------------------------------------------- |
 | `PORT`           | `3000`                | HTTP port                                    |
-| `DEFAULT_TRACKING_INTERVAL_MINUTES` | `5` | Interval in minutes; when set, applied on startup and overrides the saved interval |
+| `TRACKING_INTERVAL_MINUTES` | `5` | Tracking interval in minutes, applied on startup in all modes |
 | `DATABASE_PATH`  | `./data/lazentinel.db` | SQLite file (parent directory is created)   |
 | `CLIENT_DIST`    | `./client/dist`       | Directory of the built Vue app               |
 | `ENABLE_MULTIUSER` | `false`             | Enable accounts and private watchlists (`true` only) |
@@ -204,7 +204,7 @@ build, and semantic tags for version tags such as `v1.2.3`.
 | `PROXY_SCHEME`   | `http`                | Proxy protocol for the rotating pool: `http` or `socks5` |
 | `TWOCAPTCHA_API_KEY` | —                 | Optional 2Captcha key for the Browser API fallback |
 
-Copy `.env.example` to `.env` for local overrides (already-set environment variables win). `CHROMIUM_EXECUTABLE` remains accepted as a legacy alias for `CLOAKBROWSER_BINARY_PATH`. When `DEFAULT_TRACKING_INTERVAL_MINUTES` is set, it is applied on startup and takes precedence over the saved interval in both single-user and multi-user modes. Unset it to manage the interval through Settings (single-user mode). If it is unset or empty, a new database starts at 5 minutes and existing saved settings are preserved. The active tracking interval is stored in SQLite. Default 5 minutes, allowed 5–86400 seconds.
+Copy `.env.example` to `.env` for local overrides (already-set environment variables win). `CHROMIUM_EXECUTABLE` remains accepted as a legacy alias for `CLOAKBROWSER_BINARY_PATH`. `TRACKING_INTERVAL_MINUTES` controls the tracking interval in all modes and is applied on startup; unset or empty falls back to 5 minutes. The interval is stored in SQLite for the API/UI to display, but it is read-only in the application. Default 5 minutes, allowed 5–86400 seconds.
 
 The application, package, Docker image, container, volume and default SQLite file now use the Lazentinel name. If you are upgrading from an earlier checkout, move your existing database to `data/lazentinel.db`, or point `DATABASE_PATH` at the old file, before starting the server.
 
@@ -221,8 +221,7 @@ The application, package, Docker image, container, volume and default SQLite fil
 | `POST`   | `/api/products`              | Add a product (`{ url }`)            |
 | `DELETE` | `/api/products/:id`          | Stop tracking and delete history     |
 | `POST`   | `/api/products/:id/refresh`  | Check one product immediately        |
-| `GET`    | `/api/settings`              | Current settings                     |
-| `PUT`    | `/api/settings`              | Update `trackingIntervalSeconds`     |
+| `GET`    | `/api/settings`              | Current tracking interval            |
 
 When multi-user mode is enabled, product and settings endpoints require an
 authenticated session and return `401` otherwise.

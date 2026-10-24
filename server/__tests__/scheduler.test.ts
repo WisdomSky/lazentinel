@@ -87,28 +87,6 @@ describe('ProductService scheduler', () => {
     expect(db.getPriceRecords(created.product.id)).toHaveLength(2);
   });
 
-  it('reschedules when the interval changes and does not fire the old timer', async () => {
-    const created = await service.addProduct(DEFAULT_PRODUCT_URL);
-    const id = created.product.id;
-
-    service.start();
-
-    await advance(10_000);
-    expect(scraper.calls).toHaveLength(1);
-
-    // New timer is due 600s after this update (t=610s), not 300s after start.
-    service.updateSettings({ trackingIntervalSeconds: 600 });
-    expect(vi.getTimerCount()).toBe(1);
-
-    await advance(290_000);
-    expect(scraper.calls).toHaveLength(1);
-    expect(db.getPriceRecords(id)).toHaveLength(1);
-
-    await advance(310_000);
-    expect(scraper.calls).toHaveLength(2);
-    expect(db.getPriceRecords(id)).toHaveLength(2);
-  });
-
   it('cancels the timer when a product is deleted', async () => {
     const created = await service.addProduct(DEFAULT_PRODUCT_URL);
     const id = created.product.id;

@@ -261,15 +261,15 @@ describe('multi-user HTTP API', () => {
     expect(db.getProduct(aliceId)).not.toBeNull();
   });
 
-  it('does not allow an authenticated owner to update global settings', async () => {
+  it('does not expose a settings update endpoint to authenticated owners', async () => {
     const alice = request.agent(app);
     await registerAndLogin(alice, 'alice@example.com');
 
     const response = await alice
       .put('/api/settings')
       .send({ trackingIntervalSeconds: 60 })
-      .expect(403);
-    expect(response.body).toEqual({ error: expect.any(String) });
+      .expect(404);
+    expect(response.body).toEqual({ error: 'API route not found.' });
 
     const readBack = await alice.get('/api/settings').expect(200);
     expect(readBack.body).toEqual({ trackingIntervalSeconds: 300 });

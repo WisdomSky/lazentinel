@@ -12,9 +12,8 @@ export interface AppConfig {
   clientDist: string;
   multiUser: boolean;
   cookieSecure: boolean;
-  defaultTrackingIntervalSeconds: number;
-  /** True when DEFAULT_TRACKING_INTERVAL_MINUTES was explicitly provided. */
-  defaultTrackingIntervalFromEnv: boolean;
+  /** Startup tracking interval, converted from TRACKING_INTERVAL_MINUTES. */
+  trackingIntervalSeconds: number;
 }
 
 function parsePort(raw: string | undefined): number {
@@ -47,7 +46,7 @@ function parseClientDist(raw: string | undefined): string {
   return resolveFromCwd(raw?.trim() || 'client/dist');
 }
 
-function parseDefaultTrackingIntervalMinutes(raw: string | undefined): number {
+function parseTrackingIntervalMinutes(raw: string | undefined): number {
   const value = raw?.trim();
   if (!value) return DEFAULT_TRACKING_INTERVAL_SECONDS;
 
@@ -57,7 +56,7 @@ function parseDefaultTrackingIntervalMinutes(raw: string | undefined): number {
     : Number.NaN;
   if (!Number.isFinite(minutes) || minutes <= 0 || !isValidTrackingInterval(seconds)) {
     throw new Error(
-      `DEFAULT_TRACKING_INTERVAL_MINUTES must be a positive number of minutes that converts to between ${MIN_TRACKING_INTERVAL_SECONDS} and ${MAX_TRACKING_INTERVAL_SECONDS} seconds (received "${raw}").`,
+      `TRACKING_INTERVAL_MINUTES must be a positive number of minutes that converts to between ${MIN_TRACKING_INTERVAL_SECONDS} and ${MAX_TRACKING_INTERVAL_SECONDS} seconds (received "${raw}").`,
     );
   }
   return seconds;
@@ -76,7 +75,7 @@ export function loadLocalEnv(
 
 /** Reads server configuration from the environment. Paths are cwd-relative. */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
-  const defaultTrackingIntervalRaw = env.DEFAULT_TRACKING_INTERVAL_MINUTES;
+  const trackingIntervalRaw = env.TRACKING_INTERVAL_MINUTES;
   return {
     port: parsePort(env.PORT),
     databasePath: parseDatabasePath(env.DATABASE_PATH),
@@ -86,10 +85,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     // the single-user behavior.
     multiUser: env.ENABLE_MULTIUSER === 'true',
     cookieSecure: env.COOKIE_SECURE === 'true',
-    defaultTrackingIntervalSeconds: parseDefaultTrackingIntervalMinutes(
-      defaultTrackingIntervalRaw,
-    ),
-    defaultTrackingIntervalFromEnv: Boolean(defaultTrackingIntervalRaw?.trim()),
+    trackingIntervalSeconds: parseTrackingIntervalMinutes(trackingIntervalRaw),
   };
 }
 

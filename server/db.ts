@@ -60,13 +60,8 @@ export interface Settings {
 }
 
 export interface AppDatabaseOptions {
-  /** Initial interval for a new settings row; existing rows are preserved. */
-  defaultTrackingIntervalSeconds?: number;
-  /**
-   * Overwrite an existing saved interval with the default. Used when the
-   * deployment explicitly supplies DEFAULT_TRACKING_INTERVAL_MINUTES.
-   */
-  overrideDefaultTrackingInterval?: boolean;
+  /** Tracking interval to apply on startup. Overwrites any saved value. */
+  trackingIntervalSeconds?: number;
 }
 
 interface SettingsRow {
@@ -143,7 +138,7 @@ const PRODUCT_INDEXES = `
  */
 export class AppDatabase {
   private readonly sqlite: Database.Database;
-  private readonly defaultTrackingIntervalSeconds: number;
+  private readonly trackingIntervalSeconds: number;
 
   private readonly insertProductStmt: Database.Statement<
     {
@@ -222,10 +217,10 @@ export class AppDatabase {
   private readonly upsertSettingStmt: Database.Statement<{ key: string; value: string }, unknown>;
 
   constructor(databasePath: string, options: AppDatabaseOptions = {}) {
-    this.defaultTrackingIntervalSeconds =
-      options.defaultTrackingIntervalSeconds !== undefined &&
-      isValidTrackingInterval(options.defaultTrackingIntervalSeconds)
-        ? options.defaultTrackingIntervalSeconds
+    this.trackingIntervalSeconds =
+      options.trackingIntervalSeconds !== undefined &&
+      isValidTrackingInterval(options.trackingIntervalSeconds)
+        ? options.trackingIntervalSeconds
         : DEFAULT_TRACKING_INTERVAL_SECONDS;
 
     if (databasePath !== ':memory:') {
@@ -240,24 +235,17 @@ export class AppDatabase {
       this.sqlite.pragma('synchronous = NORMAL');
     }
     this.initializeSchema();
+    // The interval is configured only through TRACKING_INTERVAL_MINUTES, so the
+    // startup value is authoritative and overwrites any previously stored one.
     this.sqlite
-      .prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)')
+      .prepare(`
+        INSERT INTO settings (key, value) VALUES (?, ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value
+      `)
       .run(
         'trackingIntervalSeconds',
-        String(this.defaultTrackingIntervalSeconds),
+        String(this.trackingIntervalSeconds),
       );
-
-    if (options.overrideDefaultTrackingInterval) {
-      this.sqlite
-        .prepare(`
-          INSERT INTO settings (key, value) VALUES (?, ?)
-          ON CONFLICT(key) DO UPDATE SET value = excluded.value
-        `)
-        .run(
-          'trackingIntervalSeconds',
-          String(this.defaultTrackingIntervalSeconds),
-        );
-    }
 
     this.insertProductStmt = this.sqlite.prepare(`
       INSERT INTO products (user_id, url, title, brand, rating, review_count, currency, image_url, created_at)
@@ -617,7 +605,7 @@ export class AppDatabase {
     return {
       trackingIntervalSeconds: Number.isInteger(parsed)
         ? parsed
-        : this.defaultTrackingIntervalSeconds,
+        : this.trackingIntervalSeconds,
     };
   }
 

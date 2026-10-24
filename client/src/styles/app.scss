@@ -210,19 +210,6 @@ input[type='number'] {
   }
 }
 
-.settings-preset {
-  transition:
-    border-color 160ms ease,
-    background-color 160ms ease,
-    color 160ms ease;
-
-  &[aria-pressed='true'] {
-    border-color: color-mix(in oklab, var(--brand-pink) 52%, var(--border));
-    background: color-mix(in oklab, var(--brand-pink) 10%, var(--card));
-    color: var(--foreground);
-  }
-}
-
 .dialog-overlay-enter-active,
 .dialog-overlay-leave-active {
   transition: opacity 180ms ease;

@@ -382,37 +382,17 @@ describe('HTTP API', () => {
   });
 
   describe('settings', () => {
-    it('PUT persists a valid interval and GET reads it back', async () => {
-      const put = await request(app)
-        .put('/api/settings')
-        .send({ trackingIntervalSeconds: 60 })
-        .expect(200);
-      expect(put.body).toEqual({ trackingIntervalSeconds: 60 });
-
+    it('GET reads the configured interval', async () => {
       const get = await request(app).get('/api/settings').expect(200);
-      expect(get.body).toEqual({ trackingIntervalSeconds: 60 });
+      expect(get.body).toEqual({ trackingIntervalSeconds: 300 });
     });
 
-    it.each([4, 0, -1, 86_401, 5.5, 300.0001, '60', null])(
-      'rejects invalid interval %j with 400',
-      async (value) => {
-        const response = await request(app)
-          .put('/api/settings')
-          .send({ trackingIntervalSeconds: value })
-          .expect(400);
-        expect(response.body).toEqual({ error: expect.any(String) });
-      },
-    );
-
-    it('rejects a missing interval with 400', async () => {
-      const emptyBody = await request(app)
+    it('does not expose a settings update endpoint', async () => {
+      const response = await request(app)
         .put('/api/settings')
-        .send({})
-        .expect(400);
-      expect(emptyBody.body).toEqual({ error: expect.any(String) });
-
-      const noBody = await request(app).put('/api/settings').expect(400);
-      expect(noBody.body).toEqual({ error: expect.any(String) });
+        .send({ trackingIntervalSeconds: 60 })
+        .expect(404);
+      expect(response.body).toEqual({ error: 'API route not found.' });
     });
   });
 
@@ -495,12 +475,6 @@ describe('HTTP API', () => {
         .send({ url: DEFAULT_PRODUCT_URL })
         .expect(201);
       expect(created.body.product.url).toBe(DEFAULT_PRODUCT_URL);
-
-      const updated = await request(app)
-        .put('/api/settings')
-        .send({ trackingIntervalSeconds: 60 })
-        .expect(200);
-      expect(updated.body).toEqual({ trackingIntervalSeconds: 60 });
     });
   });
 });

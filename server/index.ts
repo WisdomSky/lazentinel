@@ -13,11 +13,7 @@ function main(): void {
   loadLocalEnv();
   const config = loadConfig(process.env);
   const db = new AppDatabase(config.databasePath, {
-    defaultTrackingIntervalSeconds: config.defaultTrackingIntervalSeconds,
-    // When the deployment explicitly sets DEFAULT_TRACKING_INTERVAL_MINUTES,
-    // it is authoritative on startup. Unset it to manage the interval through
-    // Settings (single-user mode).
-    overrideDefaultTrackingInterval: config.defaultTrackingIntervalFromEnv,
+    trackingIntervalSeconds: config.trackingIntervalSeconds,
   });
   const authDb = config.multiUser ? new AuthDatabase(config.authDatabasePath) : null;
   const auth = authDb ? new AuthService(authDb) : null;

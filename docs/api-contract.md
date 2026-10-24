@@ -46,7 +46,7 @@ When enabled:
   (`AUTH_DATABASE_PATH`, default `./data/lazentinel-auth.db`).
 - Passwords are stored in plaintext in the auth database, per the product
   requirement. This is intentionally insecure for public deployments.
-- Every `/api/products` and `/api/settings` request requires a valid
+- Every `/api/products` request and `GET /api/settings` requires a valid
   `lazentinel_session` HTTP-only cookie; otherwise it returns `401`.
 - Products are scoped to the authenticated owner. List, add, delete and refresh
   operate only on that owner's products. Other owners' product ids return `404`.
@@ -104,14 +104,7 @@ Fetches the Lazada page, stores metadata + the first price point, and starts tra
 Runs a check immediately. `200 { "product": Product, "warning"?: string }`, `404` if not found or not owned, `422` on scrape failure.
 
 ### `GET /api/settings`
-`200 { "trackingIntervalSeconds": number }` — protected in multi-user mode; the interval is global to the installation. When `DEFAULT_TRACKING_INTERVAL_MINUTES` is set, it is applied on startup and overrides the saved value. When unset, a new database starts at 5 minutes and existing saved values are preserved.
-
-### `PUT /api/settings`
-Body: `{ "trackingIntervalSeconds": number }`
-
-Integer between 5 and 86400. `200` with the saved settings; `400` on invalid input.
-In multi-user mode this endpoint is read-only and returns `403`, because the
-interval is installation-wide and is not editable per account.
+`200 { "trackingIntervalSeconds": number }` — protected in multi-user mode; the interval is global to the installation. It is configured with `TRACKING_INTERVAL_MINUTES` and is read-only through the API. There is no `PUT /api/settings` endpoint; updating settings returns the standard API 404.
 
 ## Scraper requirements
 

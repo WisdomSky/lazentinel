@@ -1,13 +1,9 @@
-import {
-  DEFAULT_TRACKING_INTERVAL_SECONDS,
-  isValidTrackingInterval,
-} from './config.js';
+import { DEFAULT_TRACKING_INTERVAL_SECONDS } from './config.js';
 import type { PricePoint, ProductRow, Settings } from './db.js';
 import { AppDatabase } from './db.js';
 import {
   ConflictError,
   ScrapeError,
-  ValidationError,
   isScrapeError,
   isUniqueConstraintError,
 } from './errors.js';
@@ -69,7 +65,6 @@ export interface ProductServiceLike {
     ownerId?: number,
   ): Promise<AddProductResult | null>;
   getSettings(): Settings | Promise<Settings>;
-  updateSettings(settings: Settings): Settings | Promise<Settings>;
 }
 
 export interface PriceSummary {
@@ -255,17 +250,6 @@ export class ProductService implements ProductServiceLike {
 
   getSettings(): Settings {
     return this.db.getSettings();
-  }
-
-  updateSettings(settings: Settings): Settings {
-    if (!isValidTrackingInterval(settings.trackingIntervalSeconds)) {
-      throw new ValidationError(
-        'trackingIntervalSeconds must be an integer between 5 and 86400.',
-      );
-    }
-    this.db.setSettings({ trackingIntervalSeconds: settings.trackingIntervalSeconds });
-    if (this.running) this.rescheduleAll();
-    return this.getSettings();
   }
 
   /** Starts background tracking. Calling this more than once is a no-op. */

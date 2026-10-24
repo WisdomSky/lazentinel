@@ -98,7 +98,7 @@ describe('v2 product database migration', () => {
       expect(db.getPriceRecords(1)).toEqual([
         { price: 42.5, recordedAt: '2025-12-01T00:00:00.000Z' },
       ]);
-      expect(db.getSettings()).toEqual({ trackingIntervalSeconds: 120 });
+      expect(db.getSettings()).toEqual({ trackingIntervalSeconds: 300 });
       expect(db.countProducts()).toBe(1);
       expect(db.listProducts(0)).toHaveLength(1);
       expect(db.listProducts(1)).toEqual([]);
@@ -145,10 +145,10 @@ describe('v2 product database migration', () => {
   });
 });
 
-describe('configurable default tracking interval', () => {
-  it('seeds a new database with the provided default', () => {
+describe('startup tracking interval', () => {
+  it('applies the provided interval to a new database', () => {
     const file = tempDbPath();
-    const db = new AppDatabase(file, { defaultTrackingIntervalSeconds: 900 });
+    const db = new AppDatabase(file, { trackingIntervalSeconds: 900 });
     try {
       expect(db.getSettings()).toEqual({ trackingIntervalSeconds: 900 });
     } finally {
@@ -156,31 +156,13 @@ describe('configurable default tracking interval', () => {
     }
   });
 
-  it('does not overwrite an existing saved interval', () => {
+  it('overwrites an existing saved interval with the startup value', () => {
     const file = tempDbPath();
-    const first = new AppDatabase(file, { defaultTrackingIntervalSeconds: 60 });
-    expect(first.getSettings()).toEqual({ trackingIntervalSeconds: 60 });
+    const first = new AppDatabase(file, { trackingIntervalSeconds: 60 });
     first.setSettings({ trackingIntervalSeconds: 120 });
     first.close();
 
-    const second = new AppDatabase(file, { defaultTrackingIntervalSeconds: 900 });
-    try {
-      expect(second.getSettings()).toEqual({ trackingIntervalSeconds: 120 });
-    } finally {
-      second.close();
-    }
-  });
-
-  it('overrides an existing interval when explicitly requested', () => {
-    const file = tempDbPath();
-    const first = new AppDatabase(file, { defaultTrackingIntervalSeconds: 60 });
-    first.setSettings({ trackingIntervalSeconds: 120 });
-    first.close();
-
-    const second = new AppDatabase(file, {
-      defaultTrackingIntervalSeconds: 600,
-      overrideDefaultTrackingInterval: true,
-    });
+    const second = new AppDatabase(file, { trackingIntervalSeconds: 600 });
     try {
       expect(second.getSettings()).toEqual({ trackingIntervalSeconds: 600 });
     } finally {

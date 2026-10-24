@@ -12,14 +12,12 @@ import {
   PauseCircle,
   Plus,
   RefreshCw,
-  Settings,
   Sun,
 } from 'lucide-vue-next';
 import { Toaster, toast } from 'vue-sonner';
 import 'vue-sonner/style.css';
 import AddProductDialog from '@/components/AddProductDialog.vue';
 import ProductCard from '@/components/ProductCard.vue';
-import SettingsDialog from '@/components/SettingsDialog.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -46,7 +44,6 @@ const {
   addProduct,
   removeProduct,
   refreshProduct,
-  saveSettings,
   retry,
 } = useProducts();
 
@@ -57,7 +54,6 @@ const {
   logout,
 } = useAuth();
 const addDialogOpen = ref(false);
-const settingsDialogOpen = ref(false);
 const retrying = ref(false);
 const userMenuOpen = ref(false);
 const userMenuRef = ref<HTMLElement | null>(null);
@@ -98,12 +94,6 @@ const intervalSummary = computed(() =>
   settings.value
     ? `Checks every ${formatInterval(settings.value.trackingIntervalSeconds)}`
     : 'Check interval loading…',
-);
-
-const footerInterval = computed(() =>
-  settings.value
-    ? `Checks every ${formatInterval(settings.value.trackingIntervalSeconds)}`
-    : 'Settings unavailable',
 );
 
 async function handleDelete(id: number) {
@@ -240,19 +230,6 @@ async function handleSignOut() {
               @update:model-value="setLive"
             />
           </div>
-
-          <Button
-            v-if="!authMultiUser"
-            id="settings"
-            variant="outline"
-            size="icon"
-            class="rounded-full border-border/65 bg-card/70"
-            aria-label="Open tracking settings"
-            title="Tracking settings"
-            @click="settingsDialogOpen = true"
-          >
-            <Settings aria-hidden="true" />
-          </Button>
 
           <div
             v-if="authMultiUser && authUser"
@@ -574,14 +551,6 @@ async function handleSignOut() {
       :open="addDialogOpen"
       :add-product="addProduct"
       @update:open="addDialogOpen = $event"
-    />
-
-    <SettingsDialog
-      v-if="!authMultiUser"
-      :open="settingsDialogOpen"
-      :interval-seconds="settings?.trackingIntervalSeconds ?? null"
-      :save-interval="saveSettings"
-      @update:open="settingsDialogOpen = $event"
     />
 
     <Toaster

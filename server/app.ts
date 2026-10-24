@@ -50,14 +50,6 @@ const addProductSchema = z.object({
     .max(2048, 'url must be 2048 characters or fewer'),
 });
 
-const settingsSchema = z.object({
-  trackingIntervalSeconds: z
-    .number()
-    .int('trackingIntervalSeconds must be an integer')
-    .min(5, 'trackingIntervalSeconds must be at least 5')
-    .max(86_400, 'trackingIntervalSeconds must be at most 86400'),
-});
-
 function firstIssue(error: z.ZodError): string {
   const issue = error.issues[0];
   if (!issue) return 'Invalid request body.';
@@ -267,26 +259,6 @@ export function createApp({
 
   app.get('/api/settings', async (_req, res) => {
     const settings = await service.getSettings();
-    res.json(settings);
-  });
-
-  app.put('/api/settings', async (req, res) => {
-    // In multi-user mode the interval is installation-wide, so it is not
-    // editable from an individual account. Keep the value readable for the UI.
-    if (multiUser) {
-      res.status(403).json({
-        error: 'Tracking settings can only be changed when multi-user mode is disabled.',
-      });
-      return;
-    }
-
-    const parsed = settingsSchema.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({ error: firstIssue(parsed.error) });
-      return;
-    }
-
-    const settings = await service.updateSettings(parsed.data);
     res.json(settings);
   });
 

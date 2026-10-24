@@ -6,9 +6,7 @@ import {
   getProducts,
   getSettings,
   refreshProduct as refreshProductRequest,
-  updateSettings,
 } from '@/lib/api';
-import { isValidTrackingInterval } from '@/lib/interval';
 import type { Product, ProductResponse, Settings } from '@/lib/types';
 
 const POLL_INTERVAL_MS = 1_000;
@@ -268,16 +266,6 @@ export function useProducts() {
     }
   }
 
-  async function saveSettings(seconds: number): Promise<Settings> {
-    if (!isValidTrackingInterval(seconds)) {
-      throw new Error('Choose a whole number of seconds between 5 and 86400.');
-    }
-
-    const saved = await updateSettings(seconds);
-    settings.value = saved;
-    return saved;
-  }
-
   async function retry(): Promise<void> {
     if (loadingError.value || !products.value.length) {
       await loadAll({ showSkeleton: !products.value.length });
@@ -332,7 +320,6 @@ export function useProducts() {
     addProduct,
     removeProduct,
     refreshProduct,
-    saveSettings,
     retry,
   };
 }
