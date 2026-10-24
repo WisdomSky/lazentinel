@@ -4,7 +4,42 @@
 
 ![Lazentinel](docs/screenshot.png)
 
-> The screenshot is generated from the included demo data.
+## Installation
+
+### Docker
+
+```yaml
+services:
+  app:
+    image: wisdomsky/lazentinel:latest
+    container_name: lazentinel
+    restart: unless-stopped
+    init: true
+    ports:
+      - "3008:3008"
+    environment:
+      NODE_ENV: production
+      PORT: 3008
+      TRACKING_INTERVAL_MINUTES: 60
+      DATABASE_PATH: /app/data/lazentinel.db
+      AUTH_DATABASE_PATH: /app/data/lazentinel-auth.db
+      CLIENT_DIST: /app/client/dist
+      ENABLE_MULTIUSER: true # Optional: Enables multiple users. Allows different users to create their own dedicated accounts.
+      PROXY_ENABLED: true
+      PROXY_SCHEME: http
+
+      # Uncomment this environment variable if you are serving Lazentinel over https
+      # COOKIE_SECURE: true
+
+      # Optional: If you have a Cloak Browser Subscription, you can enter your license key to use it
+      # CLOAKBROWSER_LICENSE_KEY:
+
+      # Optional: If you provide a 2Captcha API Key, it will use the Browser API as a fallback if the default stealth browser + proxies all ultimately failed
+      # TWOCAPTCHA_API_KEY:
+    volumes:
+      - /DATA/AppData/lazentinel:/app/data
+```
+
 
 ## Features
 
